@@ -44,3 +44,15 @@ const txResponse = await wallet.sendTransaction({
   const txReceipt = await txResponse.wait()
   console.info(`CELO transaction hash received: ${txReceipt.transactionHash}`)
 ```
+
+Here's an example of sending cUSD with the StableToken contract. For interacting with contracts you need the ABI and address. Addresses for Celo core contracts can be found with the CLI's `network:contracts` command. The ABIs can be built from the solidity code or extracted in ContractKit's `generated` folder.
+
+```js
+import { Contract, ethers, utils, providers } from 'ethers'
+
+const stableToken = new ethers.Contract(address, abi, wallet)
+console.info(`Sending ${amountInWei} cUSD`)
+const txResponse: providers.TransactionResponse = await stableToken.transferWithComment(recipient, amountInWei, comment)
+const txReceipt = await txResponse.wait()
+console.info(`cUSD payment hash received: ${txReceipt.transactionHash}`)
+```
