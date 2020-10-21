@@ -1,27 +1,28 @@
-import { TransactionRequest } from "@ethersproject/abstract-provider";
-import { getAddress } from "@ethersproject/address";
-import { BigNumber, BigNumberish } from "@ethersproject/bignumber";
 import {
-  arrayify,
+  BigNumber,
+  BigNumberish,
   BytesLike,
-  DataOptions,
-  hexlify,
-  hexZeroPad,
-  isBytesLike,
-  SignatureLike,
-  splitSignature,
-  stripZeros,
-} from "@ethersproject/bytes";
-import { Zero } from "@ethersproject/constants";
-import { keccak256 } from "@ethersproject/keccak256";
-import { Logger } from "@ethersproject/logger";
-import { checkProperties } from "@ethersproject/properties";
-import * as RLP from "@ethersproject/rlp";
-import { recoverAddress, Transaction } from "@ethersproject/transactions";
+  constants,
+  providers,
+  Transaction,
+  utils,
+} from "ethers";
 
-const logger = new Logger("celo/transactions");
+// From https://github.com/ethers-io/ethers.js/blob/master/packages/bytes/src.ts/index.ts#L33
+// Copied because it doesn't seem to be exported from 'ethers' anywhere
+type SignatureLike =
+  | {
+      r: string;
+      s?: string;
+      _vs?: string;
+      recoveryParam?: number;
+      v?: number;
+    }
+  | BytesLike;
 
-export interface CeloTransactionRequest extends TransactionRequest {
+const logger = new utils.Logger("celo/transactions");
+
+export interface CeloTransactionRequest extends providers.TransactionRequest {
   feeCurrency?: string;
   gatewayFeeRecipient?: string;
   gatewayFee?: BigNumberish;
@@ -64,17 +65,17 @@ export function serializeCeloTransaction(
   transaction: any,
   signature?: SignatureLike
 ): string {
-  checkProperties(transaction, celoAllowedTransactionKeys);
+  utils.checkProperties(transaction, celoAllowedTransactionKeys);
 
   const raw: Array<string | Uint8Array> = [];
 
   celoTransactionFields.forEach(function (fieldInfo) {
     let value = (<any>transaction)[fieldInfo.name] || [];
-    const options: DataOptions = {};
+    const options: any = {};
     if (fieldInfo.numeric) {
       options.hexPad = "left";
     }
-    value = arrayify(hexlify(value, options));
+    value = utils.arrayify(utils.hexlify(value, options));
 
     // Fixed-width field
     if (
@@ -91,7 +92,7 @@ export function serializeCeloTransaction(
 
     // Variable-width (with a maximum)
     if (fieldInfo.maxLength) {
-      value = stripZeros(value);
+      value = utils.stripZeros(value);
       if (value.length > fieldInfo.maxLength) {
         logger.throwArgumentError(
           "invalid length for " + fieldInfo.name,
@@ -101,7 +102,7 @@ export function serializeCeloTransaction(
       }
     }
 
-    raw.push(hexlify(value));
+    raw.push(utils.hexlify(value));
   });
 
   let chainId = 0;
@@ -118,7 +119,7 @@ export function serializeCeloTransaction(
     }
   } else if (
     signature &&
-    !isBytesLike(signature) &&
+    !utils.isBytesLike(signature) &&
     signature.v &&
     signature.v > 28
   ) {
@@ -128,19 +129,19 @@ export function serializeCeloTransaction(
 
   // We have an EIP-155 transaction (chainId was specified and non-zero)
   if (chainId !== 0) {
-    raw.push(hexlify(chainId)); // @TODO: hexValue?
+    raw.push(utils.hexlify(chainId)); // @TODO: hexValue?
     raw.push("0x");
     raw.push("0x");
   }
 
   // Requesting an unsigned transation
   if (!signature) {
-    return RLP.encode(raw);
+    return utils.RLP.encode(raw);
   }
 
   // The splitSignature will ensure the transaction has a recoveryParam in the
   // case that the signTransaction function only adds a v.
-  const sig = splitSignature(signature);
+  const sig = utils.splitSignature(signature);
 
   // We pushed a chainId and null r, s on for hashing only; remove those
   let v = 27 + sig.recoveryParam;
@@ -166,19 +167,19 @@ export function serializeCeloTransaction(
     );
   }
 
-  raw.push(hexlify(v));
-  raw.push(stripZeros(arrayify(sig.r)));
-  raw.push(stripZeros(arrayify(sig.s)));
+  raw.push(utils.hexlify(v));
+  raw.push(utils.stripZeros(utils.arrayify(sig.r)));
+  raw.push(utils.stripZeros(utils.arrayify(sig.s)));
 
-  return RLP.encode(raw);
+  return utils.RLP.encode(raw);
 }
 
 // Almost identical to https://github.com/ethers-io/ethers.js/blob/master/packages/transactions/src.ts/index.ts#L165
 // Need to override to use the celo tx prop whitelists above
 export function parseCeloTransaction(
-  rawTransaction: BytesLike
+  rawTransaction: utils.BytesLike
 ): CeloTransaction {
-  const transaction = RLP.decode(rawTransaction);
+  const transaction = utils.RLP.decode(rawTransaction);
 
   if (transaction.length !== 12 && transaction.length !== 9) {
     logger.throwArgumentError(
@@ -213,8 +214,8 @@ export function parseCeloTransaction(
     return tx;
   }
 
-  tx.r = hexZeroPad(transaction[10], 32);
-  tx.s = hexZeroPad(transaction[11], 32);
+  tx.r = utils.hexZeroPad(transaction[10], 32);
+  tx.s = utils.hexZeroPad(transaction[11], 32);
 
   if (BigNumber.from(tx.r).isZero() && BigNumber.from(tx.s).isZero()) {
     // EIP-155 unsigned transaction
@@ -233,24 +234,24 @@ export function parseCeloTransaction(
     const raw = transaction.slice(0, 6);
 
     if (tx.chainId !== 0) {
-      raw.push(hexlify(tx.chainId));
+      raw.push(utils.hexlify(tx.chainId));
       raw.push("0x");
       raw.push("0x");
       recoveryParam -= tx.chainId * 2 + 8;
     }
 
-    const digest = keccak256(RLP.encode(raw));
+    const digest = utils.keccak256(utils.RLP.encode(raw));
     try {
-      tx.from = recoverAddress(digest, {
-        r: hexlify(tx.r),
-        s: hexlify(tx.s),
+      tx.from = utils.recoverAddress(digest, {
+        r: utils.hexlify(tx.r),
+        s: utils.hexlify(tx.s),
         recoveryParam: recoveryParam,
       });
     } catch (error) {
       console.log(error);
     }
 
-    tx.hash = keccak256(rawTransaction);
+    tx.hash = utils.keccak256(rawTransaction);
   }
 
   return tx;
@@ -260,12 +261,12 @@ function handleAddress(value: string): string | undefined {
   if (value === "0x") {
     return undefined;
   }
-  return getAddress(value);
+  return utils.getAddress(value);
 }
 
 function handleNumber(value: string): BigNumber {
   if (value === "0x") {
-    return Zero;
+    return constants.Zero;
   }
   return BigNumber.from(value);
 }

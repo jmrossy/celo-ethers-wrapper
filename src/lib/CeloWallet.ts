@@ -1,16 +1,12 @@
-import { getAddress } from "@ethersproject/address";
-import { keccak256 } from "@ethersproject/keccak256";
-import { Logger } from "@ethersproject/logger";
-import { resolveProperties } from "@ethersproject/properties";
-import { Wallet } from "ethers";
+import { utils, Wallet } from "ethers";
 import { serializeCeloTransaction } from "./transactions";
 
-const logger = new Logger("CeloWallet");
+const logger = new utils.Logger("CeloWallet");
 
 const forwardErrors = [
-  Logger.errors.INSUFFICIENT_FUNDS,
-  Logger.errors.NONCE_EXPIRED,
-  Logger.errors.REPLACEMENT_UNDERPRICED,
+  utils.Logger.errors.INSUFFICIENT_FUNDS,
+  utils.Logger.errors.NONCE_EXPIRED,
+  utils.Logger.errors.REPLACEMENT_UNDERPRICED,
 ];
 
 export class CeloWallet extends Wallet {
@@ -19,7 +15,7 @@ export class CeloWallet extends Wallet {
    * https://github.com/ethers-io/ethers.js/blob/master/packages/abstract-signer/src.ts/index.ts#L168
    */
   async populateTransaction(transaction: any): Promise<any> {
-    const tx: any = await resolveProperties(transaction);
+    const tx: any = await utils.resolveProperties(transaction);
 
     if (tx.to != null) {
       tx.to = Promise.resolve(tx.to).then((to) => this.resolveName(to));
@@ -39,7 +35,7 @@ export class CeloWallet extends Wallet {
 
         return logger.throwError(
           "cannot estimate gas; transaction may fail or may require manual gas limit",
-          Logger.errors.UNPREDICTABLE_GAS_LIMIT,
+          utils.Logger.errors.UNPREDICTABLE_GAS_LIMIT,
           {
             error: error,
             tx: tx,
@@ -66,7 +62,7 @@ export class CeloWallet extends Wallet {
       });
     }
 
-    return await resolveProperties(tx);
+    return await utils.resolveProperties(tx);
   }
 
   /**
@@ -75,10 +71,10 @@ export class CeloWallet extends Wallet {
    */
   async signTransaction(transaction: any): Promise<string> {
     const populatedTx = await this.populateTransaction(transaction);
-    const tx: any = await resolveProperties(populatedTx);
+    const tx: any = await utils.resolveProperties(populatedTx);
 
     if (tx.from != null) {
-      if (getAddress(tx.from) !== this.address) {
+      if (utils.getAddress(tx.from) !== this.address) {
         logger.throwArgumentError(
           "transaction from address mismatch",
           "transaction.from",
@@ -89,7 +85,7 @@ export class CeloWallet extends Wallet {
     }
 
     const signature = this._signingKey().signDigest(
-      keccak256(serializeCeloTransaction(tx))
+      utils.keccak256(serializeCeloTransaction(tx))
     );
     const serialized = serializeCeloTransaction(tx, signature);
     return serialized;
