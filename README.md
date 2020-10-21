@@ -6,7 +6,11 @@ _Note: this is still an early experimental version_
 
 ## Install
 
-`npm i @celo-tools/celo-ethers-wrapper` or `yarn add @celo-tools/celo-ethers-wrapper`
+`npm i @celo-tools/celo-ethers-wrapper`
+
+or
+
+`yarn add @celo-tools/celo-ethers-wrapper`
 
 Note this wrapper has Ethers v5 as a peer dependency. Your project must include a dependency on that as well.
 
