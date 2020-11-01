@@ -2,7 +2,7 @@
 
 A minimal wrapper to make Ethers.JS compatible with the Celo network.
 
-_Note: this is still an early experimental version_
+_Note: this is still experimental_ 
 
 ## Install
 
@@ -14,7 +14,7 @@ or
 
 Note this wrapper has Ethers v5 as a peer dependency. Your project must include a dependency on that as well.
 
-## Example
+## Basic Usage
 
 Connect to the network by creating a `CeloProvider`, which is based on [JsonRpc-Provider](https://docs.ethers.io/v5/api/providers/jsonrpc-provider/):
 
@@ -40,14 +40,14 @@ Use the provider or wallet to make calls or send transactions:
 const txResponse = await wallet.sendTransaction({
     to: recipient,
     value: amountInWei,
-    gasPrice: 500000000,
-    gasLimit: 10000000,
-    // gatewayFeeRecipient: '0x8c2a2c7a71c68f30c1ec8940a1efe72c06d8f32f',
-    // gasCurrency: '0x874069fa1eb16d44d622f2e0ca25eea172369bc1',
   })
-  const txReceipt = await txResponse.wait()
-  console.info(`CELO transaction hash received: ${txReceipt.transactionHash}`)
+const txReceipt = await txResponse.wait()
+console.info(`CELO transaction hash received: ${txReceipt.transactionHash}`)
 ```
+
+## Contract Interaction
+
+`CeloWallet` can be used to send transactions.
 
 Here's an example of sending cUSD with the StableToken contract. For interacting with contracts you need the ABI and address. Addresses for Celo core contracts can be found with the CLI's `network:contracts` command. The ABIs can be built from the solidity code or extracted in ContractKit's `generated` folder.
 
@@ -59,4 +59,27 @@ console.info(`Sending ${amountInWei} cUSD`)
 const txResponse: providers.TransactionResponse = await stableToken.transferWithComment(recipient, amountInWei, comment)
 const txReceipt = await txResponse.wait()
 console.info(`cUSD payment hash received: ${txReceipt.transactionHash}`)
+```
+
+## Alternative gas fee currencies
+
+The Celo network supports paying for transactions with the native asset (CELO) but also with the stable token (cUSD).
+
+This wrapper currently has partial support for specifying feeCurrency in transactions.
+
+```js
+const gasPrice = await wallet.getGasPrice(stableTokenAddress)
+const gasLimit = await wallet.estimateGas(tx)
+
+// Gas estimation doesn't currently work properly for non-CELO currencies
+// The gas limit must be padded to increase tx success rate
+// TODO: Investigate more efficient ways to handle this case
+const adjustedGasLimit = gasLimit.mul(10)
+
+const txResponse = await signer.sendTransaction({
+  ...tx,
+  gasPrice,
+  gasLimit: adjustedGasLimit,
+  feeCurrency: stableTokenAddress,
+})
 ```

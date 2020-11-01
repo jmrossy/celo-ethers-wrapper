@@ -1,6 +1,6 @@
 {
   "name": "@celo-tools/celo-ethers-wrapper",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "A minimal wrapper to make Ethers.JS compatible with the Celo network.",
   "main": "build/main/index.js",
   "typings": "build/main/index.d.ts",

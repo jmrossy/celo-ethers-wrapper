@@ -1,5 +1,8 @@
-import { utils, Wallet } from "ethers";
-import { serializeCeloTransaction } from "./transactions";
+import { BigNumber, providers, utils, Wallet } from "ethers";
+import {
+  CeloTransactionRequest,
+  serializeCeloTransaction,
+} from "./transactions";
 
 const logger = new utils.Logger("CeloWallet");
 
@@ -12,9 +15,11 @@ const forwardErrors = [
 export class CeloWallet extends Wallet {
   /**
    * Override to skip checkTransaction step which rejects Celo tx properties
-   * https://github.com/ethers-io/ethers.js/blob/master/packages/abstract-signer/src.ts/index.ts#L168
+   * https://github.com/ethers-io/ethers.js/blob/master/packages/abstract-signer/src.ts/index.ts
    */
-  async populateTransaction(transaction: any): Promise<any> {
+  async populateTransaction(
+    transaction: utils.Deferrable<CeloTransactionRequest>
+  ): Promise<any> {
     const tx: any = await utils.resolveProperties(transaction);
 
     if (tx.to != null) {
@@ -67,9 +72,9 @@ export class CeloWallet extends Wallet {
 
   /**
    * Override to serialize transaction using custom serialize method
-   * https://github.com/ethers-io/ethers.js/blob/master/packages/wallet/src.ts/index.ts#L108
+   * https://github.com/ethers-io/ethers.js/blob/master/packages/wallet/src.ts/index.ts
    */
-  async signTransaction(transaction: any): Promise<string> {
+  async signTransaction(transaction: CeloTransactionRequest): Promise<string> {
     const populatedTx = await this.populateTransaction(transaction);
     const tx: any = await utils.resolveProperties(populatedTx);
 
@@ -89,5 +94,37 @@ export class CeloWallet extends Wallet {
     );
     const serialized = serializeCeloTransaction(tx, signature);
     return serialized;
+  }
+
+  /**
+   * Override just for type fix
+   * https://github.com/ethers-io/ethers.js/blob/master/packages/wallet/src.ts/index.ts
+   */
+  sendTransaction(
+    transaction: utils.Deferrable<CeloTransactionRequest>
+  ): Promise<providers.TransactionResponse> {
+    return super.sendTransaction(transaction);
+  }
+
+  /**
+   * Override to skip checkTransaction step which rejects Celo tx properties
+   * https://github.com/ethers-io/ethers.js/blob/master/packages/abstract-signer/src.ts/index.ts
+   */
+  async estimateGas(
+    transaction: utils.Deferrable<CeloTransactionRequest>
+  ): Promise<BigNumber> {
+    this._checkProvider("estimateGas");
+    const tx = await utils.resolveProperties(transaction);
+    return await this.provider.estimateGas(tx);
+  }
+
+  /**
+   * Override to support alternative gas currencies
+   * https://github.com/celo-tools/ethers.js/blob/master/packages/abstract-signer/src.ts/index.ts
+   */
+  async getGasPrice(feeCurrencyAddress?: string): Promise<BigNumber> {
+    this._checkProvider("getGasPrice");
+    // @ts-ignore
+    return await this.provider.getGasPrice(feeCurrencyAddress);
   }
 }

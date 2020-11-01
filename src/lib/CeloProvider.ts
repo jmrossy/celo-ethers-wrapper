@@ -1,15 +1,14 @@
-import { providers, utils } from "ethers";
+import { BigNumber, providers, utils } from "ethers";
 import { parseCeloTransaction } from "./transactions";
 
 export class CeloProvider extends providers.JsonRpcProvider {
   /**
    * Override to parse transaction correctly
-   * https://github.com/ethers-io/ethers.js/blob/master/packages/providers/src.ts/base-provider.ts#L1016
+   * https://github.com/ethers-io/ethers.js/blob/master/packages/providers/src.ts/base-provider.ts
    */
   async sendTransaction(
     signedTransaction: string | Promise<string>
   ): Promise<providers.TransactionResponse> {
-    // throw new Error('Currently unsupported, use sendTransactionRaw instead')
     await this.getNetwork();
     const signedTx = await Promise.resolve(signedTransaction);
     const hexTx = utils.hexlify(signedTx);
@@ -24,5 +23,30 @@ export class CeloProvider extends providers.JsonRpcProvider {
       error.transactionHash = tx.hash;
       throw error;
     }
+  }
+
+  /**
+   * Override to handle alternative gas currencies
+   * getGasPrice in https://github.com/ethers-io/ethers.js/blob/master/packages/providers/src.ts/base-provider.ts
+   */
+  async getGasPrice(feeCurrencyAddress?: string) {
+    await this.getNetwork();
+    const params = feeCurrencyAddress ? { feeCurrencyAddress } : {};
+    return BigNumber.from(await this.perform("getGasPrice", params));
+  }
+
+  /**
+   * Override to handle alternative gas currencies
+   * prepareRequest in https://github.com/ethers-io/ethers.js/blob/master/packages/providers/src.ts/json-rpc-provider.ts
+   */
+  prepareRequest(method: any, params: any): [string, Array<any>] {
+    if (method === "getGasPrice") {
+      const param = params.feeCurrencyAddress
+        ? [params.feeCurrencyAddress]
+        : [];
+      return ["eth_gasPrice", param];
+    }
+
+    return super.prepareRequest(method, params);
   }
 }
