@@ -26,7 +26,9 @@ const provider = new CeloProvider('https://alfajores-forno.celo-testnet.org')
 await provider.ready
 ```
 
-Create a CeloWallet, which is based on [Wallet](https://docs.ethers.io/v5/api/signer/#Wallet) :
+Note: for a more efficient provider based on [StaticJsonRpcProvider](https://docs.ethers.io/v5/api/providers/jsonrpc-provider/#StaticJsonRpcProvider) you can use `StaticCeloProvider` instead.
+
+Next, Create a CeloWallet, which is based on [Wallet](https://docs.ethers.io/v5/api/signer/#Wallet) :
 
 ```js
 import { CeloWallet } from '@celo-tools/celo-ethers-wrapper'

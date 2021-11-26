@@ -67,7 +67,7 @@ export class CeloWallet extends Wallet {
       });
     }
 
-    return await utils.resolveProperties(tx);
+    return utils.resolveProperties(tx);
   }
 
   /**
@@ -75,8 +75,7 @@ export class CeloWallet extends Wallet {
    * https://github.com/ethers-io/ethers.js/blob/master/packages/wallet/src.ts/index.ts
    */
   async signTransaction(transaction: CeloTransactionRequest): Promise<string> {
-    const populatedTx = await this.populateTransaction(transaction);
-    const tx: any = await utils.resolveProperties(populatedTx);
+    const tx = await this.populateTransaction(transaction);
 
     if (tx.from != null) {
       if (utils.getAddress(tx.from) !== this.address) {

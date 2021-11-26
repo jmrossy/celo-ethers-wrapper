@@ -32,7 +32,7 @@ export class CeloProvider extends providers.JsonRpcProvider {
         signedTransaction: hexTx,
       });
       return this._wrapTransaction(tx, hash);
-    } catch (error) {
+    } catch (error: any) {
       error.transaction = tx;
       error.transactionHash = tx.hash;
       throw error;

@@ -242,6 +242,7 @@ export function parseCeloTransaction(
 
     const digest = utils.keccak256(utils.RLP.encode(raw));
     try {
+      // TODO there may be an issue here with incorrect from address extraction
       tx.from = utils.recoverAddress(digest, {
         r: utils.hexlify(tx.r),
         s: utils.hexlify(tx.s),
