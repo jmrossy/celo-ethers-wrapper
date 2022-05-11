@@ -14,6 +14,12 @@ export class CeloProvider extends providers.JsonRpcProvider {
     blockFormat.gasLimit = () => BigNumber.from(0);
     blockFormat.nonce = () => "";
     blockFormat.difficulty = () => 0;
+
+    const blockWithTransactionsFormat =
+      this.formatter.formats.blockWithTransactions;
+    blockWithTransactionsFormat.gasLimit = () => BigNumber.from(0);
+    blockWithTransactionsFormat.nonce = () => "";
+    blockWithTransactionsFormat.difficulty = () => 0;
   }
 
   /**
