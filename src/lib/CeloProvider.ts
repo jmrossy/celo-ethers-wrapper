@@ -1,5 +1,8 @@
 import { BigNumber, providers, utils } from "ethers";
+import { getNetwork } from "./networks";
 import { parseCeloTransaction } from "./transactions";
+
+const logger = new utils.Logger("CeloProvider");
 
 export class CeloProvider extends providers.JsonRpcProvider {
   constructor(
@@ -68,5 +71,20 @@ export class CeloProvider extends providers.JsonRpcProvider {
     }
 
     return super.prepareRequest(method, params);
+  }
+
+  static getNetwork(networkish: providers.Networkish): providers.Network {
+    const network = getNetwork(networkish == null ? 'celo' : networkish);
+    if (network == null) {
+      return logger.throwError(
+        `unknown network: ${JSON.stringify(network)}`,
+        utils.Logger.errors.UNSUPPORTED_OPERATION,
+        {
+          operation: 'getNetwork',
+          value: networkish,
+        },
+      );
+    }
+    return network;
   }
 }
