@@ -1,4 +1,5 @@
-import { BigNumber, providers, utils, Wallet } from "ethers";
+import { BigNumber, providers, utils, Wallet, Wordlist } from "ethers";
+import type { CeloProvider } from "./CeloProvider";
 import {
   CeloTransactionRequest,
   serializeCeloTransaction,
@@ -125,5 +126,18 @@ export class CeloWallet extends Wallet {
     this._checkProvider("getGasPrice");
     // @ts-ignore
     return await this.provider.getGasPrice(feeCurrencyAddress);
+  }
+
+  connect(provider: CeloProvider): CeloWallet {
+    return new CeloWallet(this, provider);
+  }
+
+  static fromMnemonic(
+    mnemonic: string,
+    path?: string,
+    wordlist?: Wordlist
+  ): CeloWallet {
+    const wallet = super.fromMnemonic(mnemonic, path, wordlist);
+    return new CeloWallet(wallet);
   }
 }
