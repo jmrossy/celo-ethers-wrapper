@@ -2,8 +2,6 @@
 
 A minimal wrapper to make Ethers.JS compatible with the Celo network.
 
-_Note: this is still experimental_ 
-
 ## Install
 
 `npm i @celo-tools/celo-ethers-wrapper`
@@ -85,3 +83,7 @@ const txResponse = await signer.sendTransaction({
   feeCurrency: stableTokenAddress,
 })
 ```
+
+## Examples
+
+See the tests under `/test` for more detailed examples.

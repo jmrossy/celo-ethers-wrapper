@@ -174,7 +174,7 @@ export function serializeCeloTransaction(
   return utils.RLP.encode(raw);
 }
 
-// Almost identical to https://github.com/ethers-io/ethers.js/blob/master/packages/transactions/src.ts/index.ts#L165
+// Based on https://github.com/ethers-io/ethers.js/blob/0234cfbbef76b7f7a53efe4c434cc6d8892bf404/packages/transactions/src.ts/index.ts#L165
 // Need to override to use the celo tx prop whitelists above
 export function parseCeloTransaction(
   rawTransaction: utils.BytesLike
@@ -262,7 +262,11 @@ function handleAddress(value: string): string | undefined {
   if (value === "0x") {
     return undefined;
   }
-  return utils.getAddress(value);
+  try {
+    return utils.getAddress(value);
+  } catch (error) {
+    return value;
+  }
 }
 
 function handleNumber(value: string): BigNumber {
