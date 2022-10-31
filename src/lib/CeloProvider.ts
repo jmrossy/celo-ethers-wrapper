@@ -1,6 +1,9 @@
 import { BigNumber, providers, utils } from "ethers";
+import { checkProperties, hexlify, hexValue, shallowCopy } from "ethers/lib/utils"
+import { CeloJsonRpcSigner, _constructorGuard } from "./CeloRpcSigner"
+import { AccessList, accessListify } from "@ethersproject/transactions";
 import { getNetwork } from "./networks";
-import { parseCeloTransaction } from "./transactions";
+import { celoAllowedTransactionKeys, CeloTransactionRequest, parseCeloTransaction } from "./transactions";
 
 const logger = new utils.Logger("CeloProvider");
 
@@ -87,4 +90,55 @@ export class CeloProvider extends providers.JsonRpcProvider {
     }
     return network;
   }
+
+  getCeloSigner(addressOrIndex?: string | number) {
+    return new CeloJsonRpcSigner(_constructorGuard, this, addressOrIndex)
+  }
+
+
+  // TODO signer.sendUncheckedTransaction calls hexlifyTransaction on the provider given to it.
+  // and as it checks the propertiese against the allowedTransactionKeys need to either overwrite this function, or  sendUncheckedTransaction to call this with extraAllowed Keys.
+
+  // Convert an ethers.js transaction into a JSON-RPC transaction
+    //  - gasLimit => gas
+    //  - All values hexlified
+    //  - All numeric values zero-striped
+    //  - All addresses are lowercased
+    // NOTE: This allows a TransactionRequest, but all values should be resolved
+    //       before this is called
+    // @TODO: This will likely be removed in future versions and prepareRequest
+    //        will be the preferred method for this.
+    static hexlifyTransaction(transaction: CeloTransactionRequest, allowExtra?: { [key: string]: boolean }): { [key: string]: string | AccessList } {
+        // Check only allowed properties are given
+        const allowed = shallowCopy(celoAllowedTransactionKeys);
+        if (allowExtra) {
+            for (const key in allowExtra) {
+                if (allowExtra[key]) { allowed[key] = true; }
+            }
+        }
+
+        checkProperties(transaction, allowed);
+
+        const result: { [key: string]: string | AccessList } = {};
+
+        // JSON-RPC now requires numeric values to be "quantity" values
+        ["chainId", "gasLimit", "gasPrice", "type", "maxFeePerGas", "maxPriorityFeePerGas", "nonce", "value"].forEach(function(key) {
+            if ((<any>transaction)[key] == null) { return; }
+            const value = hexValue(BigNumber.from((<any>transaction)[key]));
+            if (key === "gasLimit") { key = "gas"; }
+            result[key] = value;
+        });
+
+        // added feeCurrency Here
+        ["from", "to", "data", "feeCurrency"].forEach(function(key) {
+            if ((<any>transaction)[key] == null) { return; }
+            result[key] = hexlify((<any>transaction)[key]);
+        });
+
+        if ((<any>transaction).accessList) {
+            result["accessList"] = accessListify((<any>transaction).accessList);
+        }
+
+        return result;
+    }
 }

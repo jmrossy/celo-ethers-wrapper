@@ -1,5 +1,6 @@
 import { BigNumber, Contract } from "ethers";
-import { CUSD_ADDRESS } from "./consts";
+import { CeloProvider } from "../src/lib/CeloProvider"
+import { ALFAJORES_FORNO, CUSD_ADDRESS } from "./consts";
 import { STABLE_TOKEN_ABI } from "./stableToken";
 import { getSigner } from "./utils";
 
@@ -38,6 +39,19 @@ async function main() {
   const txReceipt2 = await txResponse2.wait();
   console.info(`cUSD payment hash: ${txReceipt2.transactionHash}`);
 }
+
+async function testSigner() {
+  const provider = new CeloProvider(ALFAJORES_FORNO)
+  const signer = provider.getSigner()
+
+  console.info( 'rpc signer',signer)
+
+  console.info('message', signer.signMessage('boop'))
+
+  signer.getAddress()
+}
+
+testSigner()
 
 main()
   .then(() => console.info("Contract tests complete"))

@@ -7,6 +7,8 @@ import {
   Transaction,
   utils,
 } from "ethers";
+import { TransactionResponse } from "@ethersproject/providers"
+
 
 // From https://github.com/ethers-io/ethers.js/blob/master/packages/bytes/src.ts/index.ts#L33
 // Copied because it doesn't seem to be exported from 'ethers' anywhere
@@ -33,6 +35,8 @@ export interface CeloTransaction extends Transaction {
   gatewayFeeRecipient?: string;
   gatewayFee?: BigNumber;
 }
+
+export type CeloTransactionResponse = CeloTransaction & TransactionResponse
 
 export const celoTransactionFields = [
   { name: "nonce", maxLength: 32, numeric: true },
