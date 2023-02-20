@@ -6,7 +6,7 @@ async function main() {
     const network = process.env.NETWORK?.toLocaleLowerCase() || "celo";
     if (network !== "celo" && network !== "alfajores" && network !== "baklava") throw new Error("Invalid NETWORK provided in env. Use celo, alfajores, or baklava");
     console.info("Using CeloscanProvider with", network.toUpperCase(), "network");
-    const provider = new CeloscanProvider();
+    const provider = new CeloscanProvider(network);
     const history = await provider.getHistory(account);
     console.info("Account", account, "history:");
     console.info(history);
