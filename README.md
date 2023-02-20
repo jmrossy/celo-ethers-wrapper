@@ -84,6 +84,21 @@ const txResponse = await signer.sendTransaction({
 })
 ```
 
+## Getting transaction history with CeloscanProvider
+
+You can also rely on EthersProviders functionality, such as getting an account's transaction history, using our alternative CeloscanProvider
+
+```js
+import { CeloscanProvider } from '@celo-tools/celo-ethers-wrapper'
+
+// You can use 'celo', 'alfajores' or 'baklava'.
+// Default is 'celo' (mainnet)
+const scanProvider = new CeloscanProvider('alfajores');
+
+const history = await provider.getHistory(YOUR_ACCOUNT);
+console.info("History:", history);
+```
+
 ## Examples
 
 See the tests under `/test` for more detailed examples.
