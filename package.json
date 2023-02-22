@@ -18,7 +18,8 @@
     "build:main": "tsc -p tsconfig.json",
     "build:module": "tsc -p tsconfig.module.json",
     "test:contract": "ts-node test/useContract.ts",
-    "test:deploy": "ts-node test/deployContract.ts"
+    "test:deploy": "ts-node test/deployContract.ts",
+    "test:history": "ts-node test/getHistory.ts"
   },
   "engines": {
     "node": ">=10"
