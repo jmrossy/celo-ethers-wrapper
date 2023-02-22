@@ -23,11 +23,12 @@ export class CeloscanProvider extends providers.EtherscanProvider {
     getBaseUrl(): string {
         switch (this.network ? this.network.name : "invalid") {
             case "celo":
-                return "https:/\/explorer.celo.org/mainnet";
+                return "https://api.celoscan.io";
             case "alfajores":
-                return "https:/\/explorer.celo.org/alfajores";
+                return "https://alfajores.celoscan.io";
             case "baklava":
-                return "https:/\/explorer.celo.org/baklava";
+                // baklava is currently not supported by celoscan.io, so we use Blockscout
+                return "https://explorer.celo.org/baklava";
             default:
         };
 
