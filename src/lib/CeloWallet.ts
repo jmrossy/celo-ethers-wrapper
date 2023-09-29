@@ -1,7 +1,9 @@
 import { BigNumber, providers, utils, Wallet, Wordlist } from "ethers";
 import type { CeloProvider } from "./CeloProvider";
 import {
+  CeloTransaction,
   CeloTransactionRequest,
+  getTxType,
   serializeCeloTransaction,
 } from "./transactions";
 
@@ -20,11 +22,13 @@ export class CeloWallet extends Wallet {
    */
   async populateTransaction(
     transaction: utils.Deferrable<CeloTransactionRequest>
-  ): Promise<any> {
+  ): Promise<CeloTransactionRequest> {
     const tx: any = await utils.resolveProperties(transaction);
 
     if (tx.to != null) {
-      tx.to = Promise.resolve(tx.to).then((to) => this.resolveName(to));
+      tx.to = Promise.resolve(tx.to).then((to) =>
+        this.resolveName(to as string)
+      );
     }
     if (tx.gasPrice == null) {
       tx.gasPrice = this.getGasPrice();
@@ -68,7 +72,7 @@ export class CeloWallet extends Wallet {
       });
     }
 
-    return utils.resolveProperties(tx);
+    return utils.resolveProperties<CeloTransactionRequest>(tx);
   }
 
   /**
@@ -111,10 +115,12 @@ export class CeloWallet extends Wallet {
    * https://github.com/ethers-io/ethers.js/blob/master/packages/abstract-signer/src.ts/index.ts
    */
   async estimateGas(
-    transaction: utils.Deferrable<CeloTransactionRequest>
+    transaction: utils.Deferrable<CeloTransaction>
   ): Promise<BigNumber> {
     this._checkProvider("estimateGas");
-    const tx = await utils.resolveProperties(transaction);
+    // @ts-expect-error
+    const tx: CeloTransaction = await utils.resolveProperties(transaction);
+    void getTxType(tx);
     return await this.provider.estimateGas(tx);
   }
 

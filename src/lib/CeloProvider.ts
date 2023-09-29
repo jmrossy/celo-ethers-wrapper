@@ -5,26 +5,6 @@ import { parseCeloTransaction } from "./transactions";
 const logger = new utils.Logger("CeloProvider");
 
 export class CeloProvider extends providers.JsonRpcProvider {
-  constructor(
-    url?: utils.ConnectionInfo | string,
-    network?: providers.Networkish
-  ) {
-    super(url, network);
-
-    // Override certain block formatting properties that don't exist on Celo blocks
-    // Reaches into https://github.com/ethers-io/ethers.js/blob/master/packages/providers/src.ts/formatter.ts
-    const blockFormat = this.formatter.formats.block;
-    blockFormat.gasLimit = () => BigNumber.from(0);
-    blockFormat.nonce = () => "";
-    blockFormat.difficulty = () => 0;
-
-    const blockWithTransactionsFormat =
-      this.formatter.formats.blockWithTransactions;
-    blockWithTransactionsFormat.gasLimit = () => BigNumber.from(0);
-    blockWithTransactionsFormat.nonce = () => "";
-    blockWithTransactionsFormat.difficulty = () => 0;
-  }
-
   /**
    * Override to parse transaction correctly
    * https://github.com/ethers-io/ethers.js/blob/master/packages/providers/src.ts/base-provider.ts
@@ -33,17 +13,21 @@ export class CeloProvider extends providers.JsonRpcProvider {
     signedTransaction: string | Promise<string>
   ): Promise<providers.TransactionResponse> {
     await this.getNetwork();
-    const signedTx = await Promise.resolve(signedTransaction);
-    const hexTx = utils.hexlify(signedTx);
-    const tx = parseCeloTransaction(signedTx);
+    const hexTx = await Promise.resolve(signedTransaction).then((t) =>
+      utils.hexlify(t)
+    );
+    const tx = parseCeloTransaction(hexTx);
+    const blockNumber = await this._getInternalBlockNumber(
+      100 + 2 * this.pollingInterval
+    );
     try {
       const hash = await this.perform("sendTransaction", {
         signedTransaction: hexTx,
       });
-      return this._wrapTransaction(tx, hash);
-    } catch (error: any) {
-      error.transaction = tx;
-      error.transactionHash = tx.hash;
+      return this._wrapTransaction(tx, hash, blockNumber);
+    } catch (error) {
+      (<any>error).transaction = tx;
+      (<any>error).transactionHash = tx.hash;
       throw error;
     }
   }
@@ -74,15 +58,15 @@ export class CeloProvider extends providers.JsonRpcProvider {
   }
 
   static getNetwork(networkish: providers.Networkish): providers.Network {
-    const network = getNetwork(networkish == null ? 'celo' : networkish);
+    const network = getNetwork(networkish == null ? "celo" : networkish);
     if (network == null) {
       return logger.throwError(
         `unknown network: ${JSON.stringify(network)}`,
         utils.Logger.errors.UNSUPPORTED_OPERATION,
         {
-          operation: 'getNetwork',
+          operation: "getNetwork",
           value: networkish,
-        },
+        }
       );
     }
     return network;
