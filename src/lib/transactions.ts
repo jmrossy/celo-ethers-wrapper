@@ -7,7 +7,13 @@ import {
   Transaction,
   utils,
 } from "ethers";
-import { concatHex, isCIP42, isCIP64, isEIP1559 } from "./transaction/utils";
+import {
+  concatHex,
+  isCIP42,
+  isCIP64,
+  isEIP1559,
+  omit,
+} from "./transaction/utils";
 import { accessListify, AccessListish } from "ethers/lib/utils";
 
 // From https://github.com/ethers-io/ethers.js/blob/master/packages/bytes/src.ts/index.ts#L33
@@ -374,7 +380,7 @@ export function serializeCeloTransaction(
 export function parseCeloTransaction(
   rawTransaction: utils.BytesLike
 ): CeloTransaction {
-  const [type, transaction] = prepareParseRawTransaction(rawTransaction);
+  const [type, transaction] = splitTypeAndRawTx(rawTransaction);
 
   let tx: CeloTransaction;
   switch (type!) {
@@ -394,6 +400,7 @@ export function parseCeloTransaction(
       } as CeloTransactionCip64;
       break;
     case TxTypeToPrefix.cip42:
+      // untested
       tx = {
         type: TxTypeToPrefix.cip42,
         chainId: handleNumber(transaction[0]).toNumber(),
@@ -411,6 +418,7 @@ export function parseCeloTransaction(
       } as CeloTransactionCip42;
       break;
     case TxTypeToPrefix.eip1559:
+      // untested
       tx = {
         type: TxTypeToPrefix.eip1559,
         chainId: handleNumber(transaction[0]).toNumber(),
@@ -445,10 +453,6 @@ export function parseCeloTransaction(
     return tx;
   }
 
-  const digest = utils.keccak256(
-    serializeCeloTransaction(tx as CeloTransactionRequest)
-  );
-
   try {
     tx.v = BigNumber.from(transaction.at(-3)).toNumber();
   } catch (error) {
@@ -465,12 +469,17 @@ export function parseCeloTransaction(
     tx.v = 0;
   } else {
     // Signed Transaction
-
     const chainId = Math.max(0, Math.floor((tx.v - 35) / 2));
     tx.chainId = chainId;
     if (tx.chainId < 0) {
       tx.chainId = 0;
     }
+
+    // NOTE: Serialization needs to happen here because chainId may not populated before
+    const serialized = serializeCeloTransaction(
+      omit(tx, "v", "r", "s") as CeloTransactionRequest
+    );
+    const digest = utils.keccak256(serialized);
 
     let recoveryParam = tx.v - 27;
     if (tx.chainId !== 0) {
@@ -492,7 +501,6 @@ export function parseCeloTransaction(
     tx.hash = utils.keccak256(rawTransaction);
   }
 
-  console.log(tx);
   return tx;
 }
 
@@ -529,16 +537,15 @@ const baseTxLengths = {
   "celo-legacy": { unsigned: 12, signed: 12 },
 } as const;
 
-// const nonceToIndices = {
-//   [TxTypeToPrefix.cip64]: { nonceIndex: 1, toIndex: 5 },
-//   [TxTypeToPrefix.cip42]: { nonceIndex: 1, toIndex: 8 },
-//   [TxTypeToPrefix.eip1559]: { nonceIndex: 1, toIndex: 5 },
-//   "celo-legacy": { nonceIndex: 0, toIndex: 6 },
-// } as const;
-
 function isSigned(type: TxTypeToPrefix, transaction: string[]) {
-  const { signed } = baseTxLengths[type || "celo-legacy"];
-  return transaction.length === signed;
+  if (type) {
+    const { signed } = baseTxLengths[type];
+    return transaction.length === signed;
+  }
+
+  const r = transaction.at(-2) || "0x";
+  const s = transaction.at(-1) || "0x";
+  return r !== "0x" && s !== "0x";
 }
 
 function isCorrectLength(type: TxTypeToPrefix, transaction: string[]) {
@@ -546,19 +553,20 @@ function isCorrectLength(type: TxTypeToPrefix, transaction: string[]) {
   return transaction.length === unsigned || isSigned(type, transaction);
 }
 
-function prepareParseRawTransaction(
+function splitTypeAndRawTx(
   rawTransaction: utils.BytesLike
 ): [TxTypeToPrefix | undefined, any[]] {
   let rawStr = rawTransaction.toString();
   let type: TxTypeToPrefix | undefined;
-  for (type of [
+  for (const _type of [
     TxTypeToPrefix.cip64,
     TxTypeToPrefix.cip42,
     TxTypeToPrefix.eip1559,
   ]) {
-    const prefix = utils.hexlify(type);
+    const prefix = utils.hexlify(_type);
     if (rawStr.startsWith(prefix)) {
       rawStr = `0x${rawStr.slice(prefix.length)}`;
+      type = _type;
       break;
     }
   }

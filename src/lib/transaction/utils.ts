@@ -39,3 +39,17 @@ export function isCIP42(tx: any): boolean {
 export function concatHex(values: string[]): `0x${string}` {
   return `0x${values.reduce((acc, x) => acc + x.replace("0x", ""), "")}`;
 }
+
+export function omit<T extends Object, K extends (keyof T)[]>(
+  object: T,
+  ...keys: K
+): {
+  [Key in keyof T as Key extends K ? never : Key]: T[Key];
+} {
+  return Object.keys(object)
+    .filter((key) => !keys.includes(key as keyof T))
+    .reduce((acc, key) => {
+      acc[key as keyof T] = object[key as keyof T];
+      return acc;
+    }, {} as T);
+}
