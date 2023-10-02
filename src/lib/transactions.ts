@@ -18,6 +18,7 @@ import { accessListify, AccessListish } from "ethers/lib/utils";
 
 // NOTE: Black magic
 const Y_PARITY_EIP_2098 = 27;
+const BULLSHIT_NUMBER = 8;
 
 // From https://github.com/ethers-io/ethers.js/blob/master/packages/bytes/src.ts/index.ts#L33
 // Copied because it doesn't seem to be exported from 'ethers' anywhere
@@ -352,42 +353,34 @@ export function serializeCeloTransaction(
   // case that the signTransaction function only adds a v.
   const sig = utils.splitSignature(signature);
 
-  let v = sig.v - Y_PARITY_EIP_2098;
+  let v: number;
   if (txArgs.type) {
     // cip64,cip42, eip-1559
-    // noop
+    v = sig.v - Y_PARITY_EIP_2098;
   } else {
     // celo-legacy
-    v = sig.v + chainId * 2 + 35;
+    v = Y_PARITY_EIP_2098 + sig.recoveryParam;
+
+    if (chainId !== 0) {
+      v += chainId * 2 + BULLSHIT_NUMBER;
+
+      // If an EIP-155 v (directly or indirectly; maybe _vs) was provided, check it!
+      if (sig.v > Y_PARITY_EIP_2098 + 1 && sig.v !== v) {
+        logger.throwArgumentError(
+          "transaction.chainId/signature.v mismatch",
+          "signature",
+          signature
+        );
+      }
+    } else if (sig.v !== v) {
+      logger.throwArgumentError(
+        "transaction.chainId/signature.v mismatch",
+        "signature",
+        signature
+      );
+    }
   }
 
-  // TODO: rossy cleanup nico
-  // let v = 27 + sig.recoveryParam;
-  // if (chainId !== 0) {
-  //   // NOTE: this makes the recoveryParam recovery custom in `parseCeloTransaction`
-  //   // see line:
-  //   if (txArgs.type) {
-  //     // cip64,cip42, eip-1559
-  //   } else {
-  //     // celo-legacy
-  //     v += chainId * 2 + 8;
-  //   }
-
-  //   // If an EIP-155 v (directly or indirectly; maybe _vs) was provided, check it!
-  //   if (sig.v > 28 && sig.v !== v) {
-  //     logger.throwArgumentError(
-  //       "transaction.chainId/signature.v mismatch",
-  //       "signature",
-  //       signature
-  //     );
-  //   }
-  // } else if (sig.v !== v) {
-  //   logger.throwArgumentError(
-  //     "transaction.chainId/signature.v mismatch",
-  //     "signature",
-  //     signature
-  //   );
-  // }
   // @ts-expect-error
   const raw = prepareEncodeTx(txArgs, { ...sig, v });
   const encoded = utils.RLP.encode(raw);
@@ -484,34 +477,20 @@ export function parseCeloTransaction(
 
   // EIP-155 unsigned transaction
   if (handleNumber(tx.r).isZero() && handleNumber(tx.s).isZero()) {
-    tx.chainId = tx.v;
-    tx.v = 0;
+    if (!type) {
+      tx.chainId = tx.v;
+      tx.v = 0;
+    }
   }
   // Signed Transaction
   else {
-    let chainId: number;
     let recoveryParam = tx.v;
-    if (tx.type) {
-      // cip64, cip42, eip-1559
-      // noop, chainId is in tx
-      chainId = tx.chainId;
-    } else {
+    if (!type) {
       // celo-legacy
-      chainId = Math.max(0, Math.floor((tx.v - 35) / 2));
-      tx.chainId = chainId;
-      recoveryParam = tx.v + Y_PARITY_EIP_2098;
-      recoveryParam -= tx.chainId * 2 + 35;
+      tx.chainId = Math.max(0, Math.floor((tx.v - 35) / 2));
+      recoveryParam = tx.v - Y_PARITY_EIP_2098;
+      recoveryParam -= tx.chainId * 2 + BULLSHIT_NUMBER;
     }
-    // // NOTE: is this condition even correct now?
-    // if (!tx.chainId) {
-    //   const chainId = Math.max(0, Math.floor((tx.v - 35) / 2));
-    //   tx.chainId = chainId;
-    // }
-    // let recoveryParam = tx.v - 27;
-    // if (tx.chainId !== 0) {
-    //   // NOTE: inverse operation that was done in `serializeCeloTransaction`
-    //   recoveryParam -= tx.chainId * 2 + 8;
-    // }
 
     // NOTE: Serialization needs to happen here because chainId may not populated before
     const serialized = serializeCeloTransaction(
@@ -533,15 +512,6 @@ export function parseCeloTransaction(
     tx.hash = utils.keccak256(rawTransaction);
   }
 
-  console.log("---------");
-  console.log("Raw signed Tx", rawTransaction);
-  console.log("---------");
-  console.log("RLP decoded Tx", transaction);
-  console.log("---------");
-  console.log("Inferred type", type!);
-  console.log("---------");
-  console.log("Parsed TX from raw signed:", tx);
-  console.log("---------");
   return tx;
 }
 
