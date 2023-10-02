@@ -16,6 +16,9 @@ import {
 } from "./transaction/utils";
 import { accessListify, AccessListish } from "ethers/lib/utils";
 
+// NOTE: Black magic
+const Y_PARITY_EIP_2098 = 27;
+
 // From https://github.com/ethers-io/ethers.js/blob/master/packages/bytes/src.ts/index.ts#L33
 // Copied because it doesn't seem to be exported from 'ethers' anywhere
 type SignatureLike =
@@ -274,7 +277,8 @@ function prepareEncodeTx(
   if (signature) {
     raw.push(
       ...[
-        utils.hexlify(signature.v),
+        // NOTE: Somehow geth cannot parse `0x00` because it's dumb
+        signature.v ? utils.hexlify(signature.v) : "0x",
         utils.stripZeros(utils.arrayify(signature.r)),
         utils.stripZeros(utils.arrayify(signature.s)),
       ]
@@ -348,27 +352,42 @@ export function serializeCeloTransaction(
   // case that the signTransaction function only adds a v.
   const sig = utils.splitSignature(signature);
 
-  let v = 27 + sig.recoveryParam;
-  if (chainId !== 0) {
-    // NOTE: this makes the recoveryParam recovery custom in `parseCeloTransaction`
-    // see line:
-    v += chainId * 2 + 8;
-
-    // If an EIP-155 v (directly or indirectly; maybe _vs) was provided, check it!
-    if (sig.v > 28 && sig.v !== v) {
-      logger.throwArgumentError(
-        "transaction.chainId/signature.v mismatch",
-        "signature",
-        signature
-      );
-    }
-  } else if (sig.v !== v) {
-    logger.throwArgumentError(
-      "transaction.chainId/signature.v mismatch",
-      "signature",
-      signature
-    );
+  let v = sig.v - Y_PARITY_EIP_2098;
+  if (txArgs.type) {
+    // cip64,cip42, eip-1559
+    // noop
+  } else {
+    // celo-legacy
+    v = sig.v + chainId * 2 + 35;
   }
+
+  // TODO: rossy cleanup nico
+  // let v = 27 + sig.recoveryParam;
+  // if (chainId !== 0) {
+  //   // NOTE: this makes the recoveryParam recovery custom in `parseCeloTransaction`
+  //   // see line:
+  //   if (txArgs.type) {
+  //     // cip64,cip42, eip-1559
+  //   } else {
+  //     // celo-legacy
+  //     v += chainId * 2 + 8;
+  //   }
+
+  //   // If an EIP-155 v (directly or indirectly; maybe _vs) was provided, check it!
+  //   if (sig.v > 28 && sig.v !== v) {
+  //     logger.throwArgumentError(
+  //       "transaction.chainId/signature.v mismatch",
+  //       "signature",
+  //       signature
+  //     );
+  //   }
+  // } else if (sig.v !== v) {
+  //   logger.throwArgumentError(
+  //     "transaction.chainId/signature.v mismatch",
+  //     "signature",
+  //     signature
+  //   );
+  // }
   // @ts-expect-error
   const raw = prepareEncodeTx(txArgs, { ...sig, v });
   const encoded = utils.RLP.encode(raw);
@@ -389,13 +408,13 @@ export function parseCeloTransaction(
         type: TxTypeToPrefix.cip64,
         chainId: handleNumber(transaction[0]).toNumber(),
         nonce: handleNumber(transaction[1]).toNumber(),
-        maxPriorityFeePerGas: transaction[2],
-        maxFeePerGas: transaction[3],
+        maxPriorityFeePerGas: handleNumber(transaction[2]),
+        maxFeePerGas: handleNumber(transaction[3]),
         gasLimit: handleNumber(transaction[4]),
         to: handleAddress(transaction[5]),
         value: handleNumber(transaction[6]),
         data: transaction[7],
-        // accessList: handleAccessList(transaction[8]),
+        accessList: handleAccessList(transaction[8]),
         feeCurrency: handleAddress(transaction[9]),
       } as CeloTransactionCip64;
       break;
@@ -405,8 +424,8 @@ export function parseCeloTransaction(
         type: TxTypeToPrefix.cip42,
         chainId: handleNumber(transaction[0]).toNumber(),
         nonce: handleNumber(transaction[1]).toNumber(),
-        maxPriorityFeePerGas: transaction[2],
-        maxFeePerGas: transaction[3],
+        maxPriorityFeePerGas: handleNumber(transaction[2]),
+        maxFeePerGas: handleNumber(transaction[3]),
         gasLimit: handleNumber(transaction[4]),
         feeCurrency: handleAddress(transaction[5]),
         gatewayFeeRecipient: handleAddress(transaction[6]),
@@ -423,8 +442,8 @@ export function parseCeloTransaction(
         type: TxTypeToPrefix.eip1559,
         chainId: handleNumber(transaction[0]).toNumber(),
         nonce: handleNumber(transaction[1]).toNumber(),
-        maxPriorityFeePerGas: transaction[2],
-        maxFeePerGas: transaction[3],
+        maxPriorityFeePerGas: handleNumber(transaction[2]),
+        maxFeePerGas: handleNumber(transaction[3]),
         gasLimit: handleNumber(transaction[4]),
         to: handleAddress(transaction[5]),
         value: handleNumber(transaction[6]),
@@ -454,7 +473,7 @@ export function parseCeloTransaction(
   }
 
   try {
-    tx.v = BigNumber.from(transaction.at(-3)).toNumber();
+    tx.v = handleNumber(transaction.at(-3)).toNumber();
   } catch (error) {
     console.log(error);
     return tx;
@@ -463,29 +482,42 @@ export function parseCeloTransaction(
   tx.r = utils.hexZeroPad(transaction.at(-2), 32);
   tx.s = utils.hexZeroPad(transaction.at(-1), 32);
 
-  if (BigNumber.from(tx.r).isZero() && BigNumber.from(tx.s).isZero()) {
-    // EIP-155 unsigned transaction
+  // EIP-155 unsigned transaction
+  if (handleNumber(tx.r).isZero() && handleNumber(tx.s).isZero()) {
     tx.chainId = tx.v;
     tx.v = 0;
-  } else {
-    // Signed Transaction
-    const chainId = Math.max(0, Math.floor((tx.v - 35) / 2));
-    tx.chainId = chainId;
-    if (tx.chainId < 0) {
-      tx.chainId = 0;
+  }
+  // Signed Transaction
+  else {
+    let chainId: number;
+    let recoveryParam = tx.v;
+    if (tx.type) {
+      // cip64, cip42, eip-1559
+      // noop, chainId is in tx
+      chainId = tx.chainId;
+    } else {
+      // celo-legacy
+      chainId = Math.max(0, Math.floor((tx.v - 35) / 2));
+      tx.chainId = chainId;
+      recoveryParam = tx.v + Y_PARITY_EIP_2098;
+      recoveryParam -= tx.chainId * 2 + 35;
     }
+    // // NOTE: is this condition even correct now?
+    // if (!tx.chainId) {
+    //   const chainId = Math.max(0, Math.floor((tx.v - 35) / 2));
+    //   tx.chainId = chainId;
+    // }
+    // let recoveryParam = tx.v - 27;
+    // if (tx.chainId !== 0) {
+    //   // NOTE: inverse operation that was done in `serializeCeloTransaction`
+    //   recoveryParam -= tx.chainId * 2 + 8;
+    // }
 
     // NOTE: Serialization needs to happen here because chainId may not populated before
     const serialized = serializeCeloTransaction(
       omit(tx, "v", "r", "s") as CeloTransactionRequest
     );
     const digest = utils.keccak256(serialized);
-
-    let recoveryParam = tx.v - 27;
-    if (tx.chainId !== 0) {
-      // NOTE: inverse operation that was done in `serializeCeloTransaction`
-      recoveryParam -= tx.chainId * 2 + 8;
-    }
 
     try {
       // TODO there may be an issue here with incorrect from address extraction
@@ -501,6 +533,15 @@ export function parseCeloTransaction(
     tx.hash = utils.keccak256(rawTransaction);
   }
 
+  console.log("---------");
+  console.log("Raw signed Tx", rawTransaction);
+  console.log("---------");
+  console.log("RLP decoded Tx", transaction);
+  console.log("---------");
+  console.log("Inferred type", type!);
+  console.log("---------");
+  console.log("Parsed TX from raw signed:", tx);
+  console.log("---------");
   return tx;
 }
 

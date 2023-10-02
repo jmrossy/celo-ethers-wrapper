@@ -1,6 +1,6 @@
 import { BigNumber, providers, utils } from "ethers";
 import { getNetwork } from "./networks";
-import { parseCeloTransaction } from "./transactions";
+import { CeloTransactionRequest, parseCeloTransaction } from "./transactions";
 
 const logger = new utils.Logger("CeloProvider");
 
@@ -54,6 +54,22 @@ export class CeloProvider extends providers.JsonRpcProvider {
       return ["eth_gasPrice", param];
     }
 
+    if (method === "estimateGas") {
+      // NOTE: somehow estimategas trims lots of fields
+      // this overrides it
+      const tx = {
+        // @ts-expect-error
+        ...this.constructor.hexlifyTransaction(params.transaction, {
+          feeCurrency: true,
+          from: true,
+        }),
+      };
+      if (params.transaction.feeCurrency) {
+        tx.feeCurrency = params.transaction.feeCurrency;
+      }
+      return ["eth_estimateGas", [tx]];
+    }
+
     return super.prepareRequest(method, params);
   }
 
@@ -70,5 +86,31 @@ export class CeloProvider extends providers.JsonRpcProvider {
       );
     }
     return network;
+  }
+
+  async estimateGas(
+    transaction: utils.Deferrable<CeloTransactionRequest>
+  ): Promise<BigNumber> {
+    // NOTE: Overrides the ethers method to make sure feeCurrency and from are sent
+    // to the rpc node
+    await this.getNetwork();
+    const params = await utils.resolveProperties({
+      transaction,
+    });
+    const result = await this.perform("estimateGas", params);
+    try {
+      return BigNumber.from(result);
+    } catch (error) {
+      return logger.throwError(
+        "bad result from backend",
+        utils.Logger.errors.SERVER_ERROR,
+        {
+          method: "estimateGas",
+          params,
+          result,
+          error,
+        }
+      );
+    }
   }
 }

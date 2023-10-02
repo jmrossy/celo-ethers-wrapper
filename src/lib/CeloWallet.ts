@@ -6,6 +6,7 @@ import {
   getTxType,
   serializeCeloTransaction,
 } from "./transactions";
+import { adjustForGasInflation } from "./transaction/utils";
 
 const logger = new utils.Logger("CeloWallet");
 
@@ -24,15 +25,21 @@ export class CeloWallet extends Wallet {
     transaction: utils.Deferrable<CeloTransactionRequest>
   ): Promise<CeloTransactionRequest> {
     const tx: any = await utils.resolveProperties(transaction);
-
     if (tx.to != null) {
       tx.to = Promise.resolve(tx.to).then((to) =>
         this.resolveName(to as string)
       );
     }
-    if (tx.gasPrice == null) {
+
+    if (tx.from == null) {
+      tx.from = this.address;
+    }
+
+    const type = getTxType(tx);
+    if (!type && tx.gasPrice == null) {
       tx.gasPrice = this.getGasPrice();
     }
+
     if (tx.nonce == null) {
       tx.nonce = this.getTransactionCount("pending");
     }
@@ -120,8 +127,7 @@ export class CeloWallet extends Wallet {
     this._checkProvider("estimateGas");
     // @ts-expect-error
     const tx: CeloTransaction = await utils.resolveProperties(transaction);
-    void getTxType(tx);
-    return await this.provider.estimateGas(tx);
+    return this.provider.estimateGas(tx).then(adjustForGasInflation);
   }
 
   /**

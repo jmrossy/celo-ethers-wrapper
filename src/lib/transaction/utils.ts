@@ -1,4 +1,4 @@
-import { BigNumberish } from "ethers";
+import { BigNumber, BigNumberish } from "ethers";
 import { hexlify } from "ethers/lib/utils";
 
 function isEmpty(value: string | BigNumberish | undefined | null) {
@@ -52,4 +52,12 @@ export function omit<T extends Object, K extends (keyof T)[]>(
       acc[key as keyof T] = object[key as keyof T];
       return acc;
     }, {} as T);
+}
+
+export function adjustForGasInflation(gas: BigNumber): BigNumber {
+  // NOTE: Don't ask me
+  const GAS_INFLATION_FACTOR = 1.3;
+
+  // NOTE: prevent floating point math
+  return gas.mul(Math.floor(GAS_INFLATION_FACTOR * 100)).div(100);
 }
