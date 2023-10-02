@@ -7,13 +7,7 @@ import {
   Transaction,
   utils,
 } from "ethers";
-import {
-  concatHex,
-  isCIP42,
-  isCIP64,
-  isEIP1559,
-  omit,
-} from "./transaction/utils";
+import { concatHex, isCIP64, isEIP1559, omit } from "./transaction/utils";
 import { accessListify, AccessListish } from "ethers/lib/utils";
 
 // NOTE: Black magic
@@ -45,13 +39,6 @@ export interface CeloTransactionCip64 extends Transaction {
   feeCurrency: string;
 }
 
-export interface CeloTransactionCip42 extends Transaction {
-  type: TxTypeToPrefix.cip42;
-  feeCurrency: string;
-  gatewayFeeRecipient?: string;
-  gatewayFee?: string;
-}
-
 export interface CeloTransactionEip1559 extends Transaction {
   type: TxTypeToPrefix.eip1559;
 }
@@ -66,11 +53,9 @@ export interface LegacyCeloTransaction extends Transaction {
 export type CeloTransaction =
   | LegacyCeloTransaction
   | CeloTransactionCip64
-  | CeloTransactionCip42
   | CeloTransactionEip1559;
 
 export enum TxTypeToPrefix {
-  cip42 = 0x7c,
   cip64 = 0x7b,
   eip1559 = 0x02,
 }
@@ -177,10 +162,6 @@ export function getTxType(tx: CeloTransaction) {
     // @ts-ignore
     delete tx.gasPrice;
     return TxTypeToPrefix.cip64;
-  } else if (isCIP42(tx)) {
-    // @ts-ignore
-    delete tx.gasPrice;
-    return TxTypeToPrefix.cip42;
   } else if (isEIP1559(tx)) {
     // @ts-ignore
     delete tx.feeCurrency;
@@ -217,26 +198,6 @@ function prepareEncodeTx(
         // @ts-expect-error
         tx.accessList || [],
         tx.feeCurrency || "0x",
-      ];
-      break;
-    case TxTypeToPrefix.cip42:
-      // There shall be a typed transaction with the code 0x7c that has the following format:
-      // 0x7c || rlp([chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, feecurrency, gatewayFeeRecipient, gatewayfee, destination, amount, data, access_list, signature_y_parity, signature_r, signature_s]).
-      // This will be in addition to the type 0x02 transaction as specified in EIP-1559.
-      raw = [
-        utils.hexlify(tx.chainId!),
-        utils.hexlify(tx.nonce!),
-        tx.maxPriorityFeePerGas ? utils.hexlify(tx.maxPriorityFeePerGas) : "0x",
-        tx.maxFeePerGas ? utils.hexlify(tx.maxFeePerGas) : "0x",
-        tx.gasLimit ? utils.hexlify(tx.gasLimit) : "0x",
-        tx.feeCurrency || "0x",
-        tx.gatewayFeeRecipient || "0x",
-        tx.gatewayFee || "0x",
-        tx.to || "0x",
-        tx.value ? utils.hexlify(tx.value) : "0x",
-        tx.data || "0x",
-        // @ts-expect-error
-        tx.accessList || [],
       ];
       break;
     case TxTypeToPrefix.eip1559:
@@ -355,7 +316,7 @@ export function serializeCeloTransaction(
 
   let v: number;
   if (txArgs.type) {
-    // cip64,cip42, eip-1559
+    // cip64, eip-1559
     v = sig.v - Y_PARITY_EIP_2098;
   } else {
     // celo-legacy
@@ -410,24 +371,6 @@ export function parseCeloTransaction(
         accessList: handleAccessList(transaction[8]),
         feeCurrency: handleAddress(transaction[9]),
       } as CeloTransactionCip64;
-      break;
-    case TxTypeToPrefix.cip42:
-      // untested
-      tx = {
-        type: TxTypeToPrefix.cip42,
-        chainId: handleNumber(transaction[0]).toNumber(),
-        nonce: handleNumber(transaction[1]).toNumber(),
-        maxPriorityFeePerGas: handleNumber(transaction[2]),
-        maxFeePerGas: handleNumber(transaction[3]),
-        gasLimit: handleNumber(transaction[4]),
-        feeCurrency: handleAddress(transaction[5]),
-        gatewayFeeRecipient: handleAddress(transaction[6]),
-        gatewayFee: transaction[7] as string,
-        to: handleAddress(transaction[8]),
-        value: handleNumber(transaction[9]),
-        data: transaction[10],
-        accessList: handleAccessList(transaction[11]),
-      } as CeloTransactionCip42;
       break;
     case TxTypeToPrefix.eip1559:
       // untested
@@ -543,7 +486,6 @@ function handleAccessList(value: string): AccessListish | "0x" {
 
 const baseTxLengths = {
   [TxTypeToPrefix.cip64]: { unsigned: 10, signed: 13 },
-  [TxTypeToPrefix.cip42]: { unsigned: 12, signed: 15 },
   [TxTypeToPrefix.eip1559]: { unsigned: 9, signed: 12 },
   "celo-legacy": { unsigned: 12, signed: 12 },
 } as const;
@@ -569,11 +511,7 @@ function splitTypeAndRawTx(
 ): [TxTypeToPrefix | undefined, any[]] {
   let rawStr = rawTransaction.toString();
   let type: TxTypeToPrefix | undefined;
-  for (const _type of [
-    TxTypeToPrefix.cip64,
-    TxTypeToPrefix.cip42,
-    TxTypeToPrefix.eip1559,
-  ]) {
+  for (const _type of [TxTypeToPrefix.cip64, TxTypeToPrefix.eip1559]) {
     const prefix = utils.hexlify(_type);
     if (rawStr.startsWith(prefix)) {
       rawStr = `0x${rawStr.slice(prefix.length)}`;

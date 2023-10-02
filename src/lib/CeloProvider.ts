@@ -57,16 +57,29 @@ export class CeloProvider extends providers.JsonRpcProvider {
     if (method === "estimateGas") {
       // NOTE: somehow estimategas trims lots of fields
       // this overrides it
+      const extraneous_keys = [
+        ["from", (x: string) => x],
+        ["feeCurrency", utils.hexlify],
+        ["gatewayFeeRecipient", (x: string) => x],
+        ["gatewayFee", utils.hexlify],
+      ] as const;
+
       const tx = {
         // @ts-expect-error
-        ...this.constructor.hexlifyTransaction(params.transaction, {
-          feeCurrency: true,
-          from: true,
-        }),
+        ...this.constructor.hexlifyTransaction(
+          params.transaction,
+          extraneous_keys.reduce((acc, [key]) => {
+            acc[key] = true;
+            return acc;
+          }, {} as Record<string, true>)
+        ),
       };
-      if (params.transaction.feeCurrency) {
-        tx.feeCurrency = params.transaction.feeCurrency;
-      }
+      extraneous_keys.forEach(([key, fn]) => {
+        if (params.transaction[key]) {
+          tx[key] = fn(params.transaction[key]);
+        }
+      });
+
       return ["eth_estimateGas", [tx]];
     }
 
