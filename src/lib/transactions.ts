@@ -9,10 +9,7 @@ import {
 } from "ethers";
 import { concatHex, isCIP64, isEIP1559, omit } from "./transaction/utils";
 import { accessListify, AccessListish } from "ethers/lib/utils";
-
-// NOTE: Black magic
-const Y_PARITY_EIP_2098 = 27;
-const BULLSHIT_NUMBER = 8;
+import { EIGHT, EIP155_NUMBER, Y_PARITY_EIP_2098 } from "../consts";
 
 // From https://github.com/ethers-io/ethers.js/blob/master/packages/bytes/src.ts/index.ts#L33
 // Copied because it doesn't seem to be exported from 'ethers' anywhere
@@ -290,7 +287,7 @@ export function serializeCeloTransaction(
     signature.v > 28
   ) {
     // No chainId provided, but the signature is signing with EIP-155; derive chainId
-    chainId = Math.floor((signature.v - 35) / 2);
+    chainId = Math.floor((signature.v - EIP155_NUMBER) / 2);
   }
 
   // We have an EIP-155 transaction (chainId was specified and non-zero)
@@ -323,7 +320,7 @@ export function serializeCeloTransaction(
     v = Y_PARITY_EIP_2098 + sig.recoveryParam;
 
     if (chainId !== 0) {
-      v += chainId * 2 + BULLSHIT_NUMBER;
+      v += chainId * 2 + EIGHT;
 
       // If an EIP-155 v (directly or indirectly; maybe _vs) was provided, check it!
       if (sig.v > Y_PARITY_EIP_2098 + 1 && sig.v !== v) {
@@ -430,9 +427,9 @@ export function parseCeloTransaction(
     let recoveryParam = tx.v;
     if (!type) {
       // celo-legacy
-      tx.chainId = Math.max(0, Math.floor((tx.v - 35) / 2));
+      tx.chainId = Math.max(0, Math.floor((tx.v - EIP155_NUMBER) / 2));
       recoveryParam = tx.v - Y_PARITY_EIP_2098;
-      recoveryParam -= tx.chainId * 2 + BULLSHIT_NUMBER;
+      recoveryParam -= tx.chainId * 2 + EIGHT;
     }
 
     // NOTE: Serialization needs to happen here because chainId may not populated before

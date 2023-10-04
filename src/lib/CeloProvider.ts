@@ -65,8 +65,7 @@ export class CeloProvider extends providers.JsonRpcProvider {
       ] as const;
 
       const tx = {
-        // @ts-expect-error
-        ...this.constructor.hexlifyTransaction(
+        ...providers.JsonRpcProvider.hexlifyTransaction(
           params.transaction,
           extraneous_keys.reduce((acc, [key]) => {
             acc[key] = true;

@@ -122,11 +122,10 @@ export class CeloWallet extends Wallet {
    * https://github.com/ethers-io/ethers.js/blob/master/packages/abstract-signer/src.ts/index.ts
    */
   async estimateGas(
-    transaction: utils.Deferrable<CeloTransaction>
+    transaction: utils.Deferrable<CeloTransactionRequest>
   ): Promise<BigNumber> {
     this._checkProvider("estimateGas");
-    // @ts-expect-error
-    const tx: CeloTransaction = await utils.resolveProperties(transaction);
+    const tx = await utils.resolveProperties(transaction);
     return this.provider.estimateGas(tx).then(adjustForGasInflation);
   }
 

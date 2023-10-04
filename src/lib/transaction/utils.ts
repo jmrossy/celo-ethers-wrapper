@@ -1,5 +1,6 @@
 import { BigNumber, BigNumberish } from "ethers";
 import { hexlify } from "ethers/lib/utils";
+import { GAS_INFLATION_FACTOR } from "../../consts";
 
 function isEmpty(value: string | BigNumberish | undefined | null) {
   return (
@@ -11,6 +12,7 @@ function isEmpty(value: string | BigNumberish | undefined | null) {
       : hexlify(value) === "0x0")
   );
 }
+
 function isPresent(value: string | BigNumberish | undefined | null) {
   return !isEmpty(value);
 }
@@ -27,6 +29,7 @@ export function isCIP64(tx: any) {
     !isPresent(tx.gatewayFeeRecipient)
   );
 }
+
 export function isCIP42(tx: any): boolean {
   return (
     isEIP1559(tx) &&
@@ -55,9 +58,6 @@ export function omit<T extends Object, K extends (keyof T)[]>(
 }
 
 export function adjustForGasInflation(gas: BigNumber): BigNumber {
-  // NOTE: Don't ask me
-  const GAS_INFLATION_FACTOR = 1.3;
-
   // NOTE: prevent floating point math
   return gas.mul(Math.floor(GAS_INFLATION_FACTOR * 100)).div(100);
 }
