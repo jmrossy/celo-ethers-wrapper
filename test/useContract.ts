@@ -14,6 +14,7 @@ async function main() {
     to: signer.address,
     value: BigNumber.from("1"),
   });
+
   // Or, alternatively, break apart signing and sending:
   // const signedTx = await signer.signTransaction({
   //   to: signer.address,
@@ -23,6 +24,45 @@ async function main() {
   // const txResponse1 = await provider.sendTransaction(signedTx);
   const txReceipt1 = await txResponse1.wait();
   console.info("Funds sent. Hash:", txReceipt1.transactionHash);
+
+  console.info(
+    "[celo-legacy] Sending 1 CELO wei with cUSD feeCurrency",
+    signer.address
+  );
+  const txResponseLegacy = await signer.sendTransaction({
+    to: signer.address,
+    value: BigNumber.from("1"),
+    feeCurrency: CUSD_ADDRESS,
+  });
+  const txReceiptLegacy = await txResponseLegacy.wait();
+  console.info(
+    `[celo-legacy] CELO w/ feeCurrency payment hash: ${txReceiptLegacy.transactionHash}`
+  );
+
+  console.info("[cip64] Sending 1 CELO wei with cUSD feeCurrency");
+  const txResponseCip64 = await signer.sendTransaction({
+    to: signer.address,
+    value: BigNumber.from("1"),
+    feeCurrency: CUSD_ADDRESS,
+    maxFeePerGas: BigNumber.from(5000000000),
+    maxPriorityFeePerGas: BigNumber.from(5000000000),
+  });
+  const txReceiptCip64 = await txResponseCip64.wait();
+  console.info(
+    `[cip64] CELO w/ feeCurrency payment hash: ${txReceiptCip64.transactionHash}`
+  );
+
+  console.info("[eip1559] Sending 1 CELO wei");
+  const txResponseEip1559 = await signer.sendTransaction({
+    to: signer.address,
+    value: BigNumber.from("1"),
+    maxFeePerGas: BigNumber.from(5000000000),
+    maxPriorityFeePerGas: BigNumber.from(5000000000),
+  });
+  const txReceiptEip1559 = await txResponseEip1559.wait();
+  console.info(
+    `[eip1559] CELO payment hash: ${txReceiptEip1559.transactionHash}`
+  );
 
   const stableToken = new Contract(CUSD_ADDRESS, STABLE_TOKEN_ABI, signer);
 

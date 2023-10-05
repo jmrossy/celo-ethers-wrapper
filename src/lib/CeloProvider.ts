@@ -1,30 +1,10 @@
 import { BigNumber, providers, utils } from "ethers";
 import { getNetwork } from "./networks";
-import { parseCeloTransaction } from "./transactions";
+import { CeloTransactionRequest, parseCeloTransaction } from "./transactions";
 
 const logger = new utils.Logger("CeloProvider");
 
 export class CeloProvider extends providers.JsonRpcProvider {
-  constructor(
-    url?: utils.ConnectionInfo | string,
-    network?: providers.Networkish
-  ) {
-    super(url, network);
-
-    // Override certain block formatting properties that don't exist on Celo blocks
-    // Reaches into https://github.com/ethers-io/ethers.js/blob/master/packages/providers/src.ts/formatter.ts
-    const blockFormat = this.formatter.formats.block;
-    blockFormat.gasLimit = () => BigNumber.from(0);
-    blockFormat.nonce = () => "";
-    blockFormat.difficulty = () => 0;
-
-    const blockWithTransactionsFormat =
-      this.formatter.formats.blockWithTransactions;
-    blockWithTransactionsFormat.gasLimit = () => BigNumber.from(0);
-    blockWithTransactionsFormat.nonce = () => "";
-    blockWithTransactionsFormat.difficulty = () => 0;
-  }
-
   /**
    * Override to parse transaction correctly
    * https://github.com/ethers-io/ethers.js/blob/master/packages/providers/src.ts/base-provider.ts
@@ -33,17 +13,21 @@ export class CeloProvider extends providers.JsonRpcProvider {
     signedTransaction: string | Promise<string>
   ): Promise<providers.TransactionResponse> {
     await this.getNetwork();
-    const signedTx = await Promise.resolve(signedTransaction);
-    const hexTx = utils.hexlify(signedTx);
-    const tx = parseCeloTransaction(signedTx);
+    const hexTx = await Promise.resolve(signedTransaction).then((t) =>
+      utils.hexlify(t)
+    );
+    const tx = parseCeloTransaction(hexTx);
+    const blockNumber = await this._getInternalBlockNumber(
+      100 + 2 * this.pollingInterval
+    );
     try {
       const hash = await this.perform("sendTransaction", {
         signedTransaction: hexTx,
       });
-      return this._wrapTransaction(tx, hash);
-    } catch (error: any) {
-      error.transaction = tx;
-      error.transactionHash = tx.hash;
+      return this._wrapTransaction(tx, hash, blockNumber);
+    } catch (error) {
+      (<any>error).transaction = tx;
+      (<any>error).transactionHash = tx.hash;
       throw error;
     }
   }
@@ -70,21 +54,75 @@ export class CeloProvider extends providers.JsonRpcProvider {
       return ["eth_gasPrice", param];
     }
 
+    if (method === "estimateGas") {
+      // NOTE: somehow estimategas trims lots of fields
+      // this overrides it
+      const extraneous_keys = [
+        ["from", (x: string) => x],
+        ["feeCurrency", utils.hexlify],
+        ["gatewayFeeRecipient", (x: string) => x],
+        ["gatewayFee", utils.hexlify],
+      ] as const;
+
+      const tx = {
+        ...providers.JsonRpcProvider.hexlifyTransaction(
+          params.transaction,
+          extraneous_keys.reduce((acc, [key]) => {
+            acc[key] = true;
+            return acc;
+          }, {} as Record<string, true>)
+        ),
+      };
+      extraneous_keys.forEach(([key, fn]) => {
+        if (params.transaction[key]) {
+          tx[key] = fn(params.transaction[key]);
+        }
+      });
+
+      return ["eth_estimateGas", [tx]];
+    }
+
     return super.prepareRequest(method, params);
   }
 
   static getNetwork(networkish: providers.Networkish): providers.Network {
-    const network = getNetwork(networkish == null ? 'celo' : networkish);
+    const network = getNetwork(networkish == null ? "celo" : networkish);
     if (network == null) {
       return logger.throwError(
         `unknown network: ${JSON.stringify(network)}`,
         utils.Logger.errors.UNSUPPORTED_OPERATION,
         {
-          operation: 'getNetwork',
+          operation: "getNetwork",
           value: networkish,
-        },
+        }
       );
     }
     return network;
+  }
+
+  async estimateGas(
+    transaction: utils.Deferrable<CeloTransactionRequest>
+  ): Promise<BigNumber> {
+    // NOTE: Overrides the ethers method to make sure feeCurrency and from are sent
+    // to the rpc node
+    await this.getNetwork();
+    const params = await utils.resolveProperties({
+      transaction,
+    });
+    const result = await this.perform("estimateGas", params);
+    try {
+      return BigNumber.from(result);
+    } catch (error) {
+      return logger.throwError(
+        "bad result from backend",
+        utils.Logger.errors.SERVER_ERROR,
+        {
+          method: "estimateGas",
+          params,
+          result,
+          error,
+        }
+      );
+    }
   }
 }
