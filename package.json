@@ -1,6 +1,6 @@
 {
   "name": "@celo-tools/celo-ethers-wrapper",
-  "version": "0.4.0",
+  "version": "1.0.0",
   "description": "A minimal wrapper to make Ethers.JS compatible with the Celo network.",
   "main": "build/main/index.js",
   "typings": "build/main/index.d.ts",
@@ -17,6 +17,7 @@
     "build": "yarn build:main && yarn build:module",
     "build:main": "tsc -p tsconfig.json",
     "build:module": "tsc -p tsconfig.module.json",
+    "test": "yarn test:contract && yarn test:deploy && yarn test:history",
     "test:contract": "ts-node test/useContract.ts",
     "test:deploy": "ts-node test/deployContract.ts",
     "test:history": "ts-node test/getHistory.ts"

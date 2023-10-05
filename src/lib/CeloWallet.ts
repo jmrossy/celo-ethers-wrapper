@@ -1,12 +1,11 @@
 import { BigNumber, providers, utils, Wallet, Wordlist } from "ethers";
 import type { CeloProvider } from "./CeloProvider";
+import { adjustForGasInflation } from "./transaction/utils";
 import {
-  CeloTransaction,
   CeloTransactionRequest,
   getTxType,
   serializeCeloTransaction,
 } from "./transactions";
-import { adjustForGasInflation } from "./transaction/utils";
 
 const logger = new utils.Logger("CeloWallet");
 
