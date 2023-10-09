@@ -16,7 +16,7 @@ export default class CeloProvider extends JsonRpcProvider {
     if (req.method === "call" || req.method === "estimateGas") {
       let tx = req.transaction;
       if (tx && tx.type != null && getBigInt(tx.type)) {
-        // If there are no EIP-1559 properties, it might be non-EIP-a559
+        // If there are no EIP-1559 properties, it might be non-EIP-1559
         if (tx.maxFeePerGas == null && tx.maxPriorityFeePerGas == null) {
           const feeData = await this.getFeeData();
           if (
