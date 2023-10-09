@@ -1,5 +1,5 @@
-import { ContractFactory } from "ethers";
-import HelloWorldContract from "./HelloWorld.json";
+import { Contract, ContractFactory } from "ethers";
+import HelloWorldContract from "./HelloWorld";
 import { getSigner } from "./utils";
 
 async function main() {
@@ -11,13 +11,13 @@ async function main() {
     signer
   );
   const contract = await factory.deploy();
-  await contract.deployTransaction.wait();
-  console.info("Contract deployed, address:", contract.address);
+  const receipt = await contract.deploymentTransaction()?.wait();
+  console.info("Contract deployed, address:", receipt?.contractAddress);
 
   console.info("Sending tx to contract");
-  const txResponse = await contract.setName("myName");
+  const txResponse = await (contract as Contract).setName("myName");
   const txReceipt = await txResponse.wait();
-  console.info("tx sent, hash:", txReceipt.transactionHash);
+  console.info("tx sent, hash:", txReceipt.hash);
 }
 
 main()

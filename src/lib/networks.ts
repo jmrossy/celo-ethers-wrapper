@@ -1,55 +1,57 @@
-import { providers, utils } from 'ethers';
-
-const logger = new utils.Logger("CeloNetworks");
+import { Networkish, assertArgument } from "ethers";
 
 const networks = [
   {
-    name: 'celo',
+    name: "celo",
     chainId: 42220,
   },
   {
-    name: 'alfajores',
+    name: "alfajores",
     chainId: 44787,
   },
   {
-    name: 'baklava',
+    name: "baklava",
     chainId: 62320,
   },
 ];
 
-export function getNetwork(
-  network?: providers.Networkish,
-): null | providers.Network {
+export function getNetwork(network?: Networkish): null | Networkish {
   {
     if (network == null) {
       return null;
     }
 
     // Chain ID
-    if (typeof network === 'number') {
-      const matches = networks.filter((n) => n.chainId === network);
+    if (typeof network === "number" || typeof network === "bigint") {
+      const matches = networks.filter((n) => n.chainId === Number(network));
       if (matches.length) {
-        return { name: matches[0].name, chainId: matches[0].chainId };
+        return {
+          name: matches[0].name,
+          chainId: matches[0].chainId,
+        };
       }
 
       return {
-        name: 'unknown',
-        chainId: network,
+        name: "unknown",
+        chainId: Number(network),
       };
     }
 
     // Chain name
-    if (typeof network === 'string') {
+    if (typeof network === "string") {
       const matches = networks.filter((n) => n.name === network);
       if (matches.length) {
-        return { name: matches[0].name, chainId: matches[0].chainId };
+        return {
+          name: matches[0].name,
+          chainId: matches[0].chainId,
+        };
       }
       return null;
     }
 
     if (
-      typeof network.name === 'string' &&
-      typeof network.chainId === 'number'
+      typeof network.name === "string" &&
+      typeof network.chainId === "number"
     ) {
       const byName = getNetwork(network.name);
       const byChainId = getNetwork(network.chainId);
@@ -66,17 +68,15 @@ export function getNetwork(
       if (
         byName &&
         byChainId &&
+        // @ts-expect-error
         byName.name === byChainId.name &&
+        // @ts-expect-error
         byName.chainId === byChainId.chainId
       ) {
         return byName;
       }
     }
 
-    return logger.throwArgumentError(
-      'network chainId mismatch',
-      'network',
-      network,
-    );
+    assertArgument(false, "network chainId mismatch", "network", network);
   }
 }

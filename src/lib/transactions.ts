@@ -1,50 +1,51 @@
 import {
-  BigNumber,
+  accessListify,
+  AccessListish,
+  assertArgument,
   BytesLike,
-  constants,
-  providers,
+  decodeRlp,
+  encodeRlp,
+  getAddress,
+  getBigInt,
+  getBytes,
+  getNumber,
+  hexlify,
+  isBytesLike,
+  keccak256,
+  recoverAddress,
+  RlpStructuredData,
   Signature,
-  Transaction,
-  utils,
+  SignatureLike,
+  stripZerosLeft,
+  toBeArray,
+  toBeHex,
+  TransactionLike,
+  TransactionRequest,
+  zeroPadValue,
 } from "ethers";
-import { concatHex, isCIP64, isEIP1559, omit } from "./transaction/utils";
-import { accessListify, AccessListish } from "ethers/lib/utils";
+import { concatHex, isCIP64, isEIP1559 } from "./transaction/utils";
 import { EIGHT, EIP155_NUMBER, Y_PARITY_EIP_2098 } from "../consts";
 
-// From https://github.com/ethers-io/ethers.js/blob/master/packages/bytes/src.ts/index.ts#L33
-// Copied because it doesn't seem to be exported from 'ethers' anywhere
-type SignatureLike =
-  | {
-      r: string;
-      s?: string;
-      _vs?: string;
-      recoveryParam?: number;
-      v?: number;
-    }
-  | BytesLike;
-
-const logger = new utils.Logger("celo/transactions");
-
-export interface CeloTransactionRequest extends providers.TransactionRequest {
+export interface CeloTransactionRequest extends TransactionRequest {
   feeCurrency?: string;
   gatewayFeeRecipient?: string;
-  gatewayFee?: string;
+  gatewayFee?: bigint;
 }
 
-export interface CeloTransactionCip64 extends Transaction {
+export interface CeloTransactionCip64 extends TransactionLike {
   type: TxTypeToPrefix.cip64;
   feeCurrency: string;
 }
 
-export interface CeloTransactionEip1559 extends Transaction {
+export interface CeloTransactionEip1559 extends TransactionLike {
   type: TxTypeToPrefix.eip1559;
 }
-export interface LegacyCeloTransaction extends Transaction {
+export interface LegacyCeloTransaction extends TransactionLike {
   type: undefined;
-  gasPrice: BigNumber;
+  gasPrice: bigint;
   feeCurrency: string;
   gatewayFeeRecipient: string;
-  gatewayFee: BigNumber;
+  gatewayFee: bigint;
 }
 
 export type CeloTransaction =
@@ -61,7 +62,6 @@ interface Field {
   maxLength?: number;
   length?: number;
   numeric?: true;
-  deprecated?: true;
 }
 export const celoAllowedTransactionKeys = {
   type: true,
@@ -93,6 +93,8 @@ type CeloFieldName =
       | "from"
       | "customData"
       | "ccipReadEnabled"
+      | "blockTag"
+      | "enableCcipRead"
     >
   | "feeCurrency"
   | "gatewayFeeRecipient"
@@ -113,41 +115,48 @@ export const celoTransactionFields: Record<CeloFieldName, Field> = {
 } as const;
 
 function formatCeloField(name: CeloFieldName, value: any) {
-  value = value || [];
-
   const fieldInfo = celoTransactionFields[name];
   const options: any = {};
+
+  if (!value || value === "0x") return value;
+
   if (fieldInfo.numeric) {
     options.hexPad = "left";
+    value = value ? toBeHex(value, fieldInfo.maxLength) : "0x";
+  } else {
+    value = hexlify(value);
   }
-  value = utils.arrayify(utils.hexlify(value, options));
+
+  let _value = toBeArray(value);
 
   // Fixed-width field
   if (
     fieldInfo.length &&
-    value.length !== fieldInfo.length &&
-    value.length > 0
+    _value.length !== fieldInfo.length &&
+    _value.length > 0
   ) {
-    logger.throwArgumentError(
+    assertArgument(
+      false,
       "invalid length for " + name,
       "transaction:" + name,
-      value
+      _value
     );
   }
 
   // Variable-width (with a maximum)
   if (fieldInfo.maxLength) {
-    value = utils.stripZeros(value);
-    if (value.length > fieldInfo.maxLength) {
-      logger.throwArgumentError(
+    _value = toBeArray(stripZerosLeft(_value));
+    if (_value.length > fieldInfo.maxLength) {
+      assertArgument(
+        false,
         "invalid length for " + name,
         "transaction:" + name,
-        value
+        _value
       );
     }
   }
 
-  return utils.hexlify(value);
+  return hexlify(_value);
 }
 
 export function getTxType(tx: CeloTransaction) {
@@ -177,20 +186,20 @@ export function getTxType(tx: CeloTransaction) {
 function prepareEncodeTx(
   tx: CeloTransaction,
   signature?: Signature
-): (string | Uint8Array)[] {
-  let raw: (string | Uint8Array)[] = [];
+): RlpStructuredData {
+  let raw: RlpStructuredData[] = [];
   switch (tx.type) {
     case TxTypeToPrefix.cip64:
       // https://github.com/celo-org/celo-proposals/blob/master/CIPs/cip-0064.md
       // 0x7b || rlp([chainId, nonce, maxPriorityFeePerGas, maxFeePerGas, gasLimit, to, value, data, accessList, feeCurrency, signatureYParity, signatureR, signatureS]).
       raw = [
-        utils.hexlify(tx.chainId!), // NOTE: is this safe or nah?
-        utils.hexlify(tx.nonce!), // NOTE: is this safe or nah?
-        tx.maxPriorityFeePerGas ? utils.hexlify(tx.maxPriorityFeePerGas) : "0x",
-        tx.maxFeePerGas ? utils.hexlify(tx.maxFeePerGas) : "0x",
-        tx.gasLimit ? utils.hexlify(tx.gasLimit) : "0x",
+        toBeHex(tx.chainId!),
+        toBeHex(tx.nonce!),
+        tx.maxPriorityFeePerGas ? toBeHex(tx.maxPriorityFeePerGas) : "0x",
+        tx.maxFeePerGas ? toBeHex(tx.maxFeePerGas) : "0x",
+        tx.gasLimit ? toBeHex(tx.gasLimit) : "0x",
         tx.to || "0x",
-        tx.value ? utils.hexlify(tx.value) : "0x",
+        tx.value ? toBeHex(tx.value) : "0x",
         tx.data || "0x",
         // @ts-expect-error
         tx.accessList || [],
@@ -201,13 +210,13 @@ function prepareEncodeTx(
       // https://eips.ethereum.org/EIPS/eip-1559
       // 0x02 || rlp([chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, destination, amount, data, access_list, signature_y_parity, signature_r, signature_s]).
       raw = [
-        utils.hexlify(tx.chainId!),
-        utils.hexlify(tx.nonce!),
-        tx.maxPriorityFeePerGas ? utils.hexlify(tx.maxPriorityFeePerGas) : "0x",
-        tx.maxFeePerGas ? utils.hexlify(tx.maxFeePerGas) : "0x",
-        tx.gasLimit ? utils.hexlify(tx.gasLimit) : "0x",
+        toBeHex(tx.chainId!),
+        toBeHex(tx.nonce!),
+        tx.maxPriorityFeePerGas ? toBeHex(tx.maxPriorityFeePerGas) : "0x",
+        tx.maxFeePerGas ? toBeHex(tx.maxFeePerGas) : "0x",
+        tx.gasLimit ? toBeHex(tx.gasLimit) : "0x",
         tx.to || "0x",
-        tx.value ? utils.hexlify(tx.value) : "0x",
+        tx.value ? toBeHex(tx.value) : "0x",
         tx.data || "0x",
         // @ts-expect-error
         tx.accessList || [],
@@ -217,18 +226,18 @@ function prepareEncodeTx(
       // This order should match the order in Geth.
       // https://github.com/celo-org/celo-blockchain/blob/027dba2e4584936cc5a8e8993e4e27d28d5247b8/core/types/transaction.go#L65
       raw = [
-        utils.hexlify(tx.nonce!),
-        tx.gasPrice ? utils.hexlify(tx.gasPrice) : "0x",
-        tx.gasLimit ? utils.hexlify(tx.gasLimit) : "0x",
+        toBeHex(tx.nonce!),
+        tx.gasPrice ? toBeHex(tx.gasPrice) : "0x",
+        tx.gasLimit ? toBeHex(tx.gasLimit) : "0x",
         tx.feeCurrency || "0x",
         tx.gatewayFeeRecipient || "0x",
-        tx.gatewayFee ? utils.hexlify(tx.gatewayFee) : "0x",
+        tx.gatewayFee ? toBeHex(tx.gatewayFee) : "0x",
         tx.to || "0x",
-        tx.value ? utils.hexlify(tx.value) : "0x",
+        tx.value ? toBeHex(tx.value) : "0x",
         tx.data || "0x",
       ];
       if (!signature) {
-        raw.push(...[utils.hexlify(tx.chainId!), "0x", "0x"]);
+        raw.push(...[toBeHex(tx.chainId!), "0x", "0x"]);
       }
       break;
   }
@@ -237,9 +246,9 @@ function prepareEncodeTx(
     raw.push(
       ...[
         // NOTE: Somehow geth cannot parse `0x00` because it's dumb
-        signature.v ? utils.hexlify(signature.v) : "0x",
-        utils.stripZeros(utils.arrayify(signature.r)),
-        utils.stripZeros(utils.arrayify(signature.s)),
+        signature.v ? toBeHex(signature.v) : "0x",
+        stripZerosLeft(getBytes(signature.r)),
+        stripZerosLeft(getBytes(signature.s)),
       ]
     );
   }
@@ -253,7 +262,16 @@ export function serializeCeloTransaction(
   transaction: CeloTransactionRequest,
   signature?: SignatureLike
 ): string {
-  utils.checkProperties(transaction, celoAllowedTransactionKeys);
+  Object.keys(transaction).forEach((property) => {
+    if (!(property in celoAllowedTransactionKeys)) {
+      assertArgument(
+        false,
+        "unknown property",
+        "serializeCeloTransaction",
+        property
+      );
+    }
+  });
 
   const txArgs: Partial<Record<keyof CeloTransaction, string | Uint8Array>> =
     {};
@@ -271,10 +289,11 @@ export function serializeCeloTransaction(
   let chainId = 0;
   if (transaction.chainId != null) {
     // A chainId was provided; if non-zero we'll use EIP-155
-    chainId = transaction.chainId;
+    chainId = parseInt(transaction.chainId.toString(16), 16);
 
     if (typeof chainId !== "number") {
-      logger.throwArgumentError(
+      assertArgument(
+        false,
         "invalid transaction.chainId",
         "transaction",
         transaction
@@ -282,17 +301,17 @@ export function serializeCeloTransaction(
     }
   } else if (
     signature &&
-    !utils.isBytesLike(signature) &&
+    !isBytesLike(signature) &&
     signature.v &&
-    signature.v > 28
+    getNumber(signature.v) > 28
   ) {
     // No chainId provided, but the signature is signing with EIP-155; derive chainId
-    chainId = Math.floor((signature.v - EIP155_NUMBER) / 2);
+    chainId = Math.floor((getNumber(signature.v) - EIP155_NUMBER) / 2);
   }
 
   // We have an EIP-155 transaction (chainId was specified and non-zero)
   if (chainId !== 0) {
-    txArgs["chainId"] = utils.hexlify(chainId); // @TODO: hexValue?
+    txArgs["chainId"] = toBeHex(chainId); // @TODO: hexValue?
   }
 
   // Requesting an unsigned transation
@@ -303,13 +322,13 @@ export function serializeCeloTransaction(
   if (!signature) {
     // @ts-expect-error
     const raw = prepareEncodeTx(txArgs);
-    const encoded = utils.RLP.encode(raw);
-    return type ? concatHex([utils.hexlify(type), encoded]) : encoded;
+    const encoded = encodeRlp(raw);
+    return type ? concatHex([toBeHex(type), encoded]) : encoded;
   }
 
   // The splitSignature will ensure the transaction has a recoveryParam in the
   // case that the signTransaction function only adds a v.
-  const sig = utils.splitSignature(signature);
+  const sig = Signature.from(signature);
 
   let v: number;
   if (txArgs.type) {
@@ -317,21 +336,23 @@ export function serializeCeloTransaction(
     v = sig.v - Y_PARITY_EIP_2098;
   } else {
     // celo-legacy
-    v = Y_PARITY_EIP_2098 + sig.recoveryParam;
+    v = Y_PARITY_EIP_2098 + sig.yParity;
 
     if (chainId !== 0) {
       v += chainId * 2 + EIGHT;
 
       // If an EIP-155 v (directly or indirectly; maybe _vs) was provided, check it!
       if (sig.v > Y_PARITY_EIP_2098 + 1 && sig.v !== v) {
-        logger.throwArgumentError(
+        assertArgument(
+          false,
           "transaction.chainId/signature.v mismatch",
           "signature",
           signature
         );
       }
     } else if (sig.v !== v) {
-      logger.throwArgumentError(
+      assertArgument(
+        false,
         "transaction.chainId/signature.v mismatch",
         "signature",
         signature
@@ -340,15 +361,15 @@ export function serializeCeloTransaction(
   }
 
   // @ts-expect-error
-  const raw = prepareEncodeTx(txArgs, { ...sig, v });
-  const encoded = utils.RLP.encode(raw);
-  return type ? concatHex([utils.hexlify(type), encoded]) : encoded;
+  const raw = prepareEncodeTx(txArgs, { ...sig.toJSON(), v });
+  const encoded = encodeRlp(raw);
+  return type ? concatHex([toBeHex(type), encoded]) : encoded;
 }
 
 // Based on https://github.com/ethers-io/ethers.js/blob/0234cfbbef76b7f7a53efe4c434cc6d8892bf404/packages/transactions/src.ts/index.ts#L165
 // Need to override to use the celo tx prop whitelists above
 export function parseCeloTransaction(
-  rawTransaction: utils.BytesLike
+  rawTransaction: BytesLike
 ): CeloTransaction {
   const [type, transaction] = splitTypeAndRawTx(rawTransaction);
 
@@ -357,45 +378,45 @@ export function parseCeloTransaction(
     case TxTypeToPrefix.cip64:
       tx = {
         type: TxTypeToPrefix.cip64,
-        chainId: handleNumber(transaction[0]).toNumber(),
-        nonce: handleNumber(transaction[1]).toNumber(),
-        maxPriorityFeePerGas: handleNumber(transaction[2]),
-        maxFeePerGas: handleNumber(transaction[3]),
-        gasLimit: handleNumber(transaction[4]),
-        to: handleAddress(transaction[5]),
-        value: handleNumber(transaction[6]),
+        chainId: handleNumber(transaction[0] as string),
+        nonce: handleNumber(transaction[1] as string),
+        maxPriorityFeePerGas: handleBigInt(transaction[2] as string),
+        maxFeePerGas: handleBigInt(transaction[3] as string),
+        gasLimit: handleBigInt(transaction[4] as string),
+        to: handleAddress(transaction[5] as string),
+        value: handleBigInt(transaction[6] as string),
         data: transaction[7],
-        accessList: handleAccessList(transaction[8]),
-        feeCurrency: handleAddress(transaction[9]),
+        accessList: handleAccessList(transaction[8] as string),
+        feeCurrency: handleAddress(transaction[9] as string),
       } as CeloTransactionCip64;
       break;
     case TxTypeToPrefix.eip1559:
       // untested
       tx = {
         type: TxTypeToPrefix.eip1559,
-        chainId: handleNumber(transaction[0]).toNumber(),
-        nonce: handleNumber(transaction[1]).toNumber(),
-        maxPriorityFeePerGas: handleNumber(transaction[2]),
-        maxFeePerGas: handleNumber(transaction[3]),
-        gasLimit: handleNumber(transaction[4]),
-        to: handleAddress(transaction[5]),
-        value: handleNumber(transaction[6]),
-        data: transaction[7],
-        accessList: handleAccessList(transaction[8]),
+        chainId: handleNumber(transaction[0] as string),
+        nonce: handleNumber(transaction[1] as string),
+        maxPriorityFeePerGas: handleBigInt(transaction[2] as string),
+        maxFeePerGas: handleBigInt(transaction[3] as string),
+        gasLimit: handleBigInt(transaction[4] as string),
+        to: handleAddress(transaction[5] as string),
+        value: handleBigInt(transaction[6] as string),
+        data: transaction[7] as string,
+        accessList: handleAccessList(transaction[8] as string),
       } as CeloTransactionEip1559;
       break;
     default:
       tx = {
-        nonce: handleNumber(transaction[0]).toNumber(),
-        gasPrice: handleNumber(transaction[1]),
-        gasLimit: handleNumber(transaction[2]),
-        feeCurrency: handleAddress(transaction[3]),
-        gatewayFeeRecipient: handleAddress(transaction[4]),
-        gatewayFee: handleNumber(transaction[5]),
-        to: handleAddress(transaction[6]),
-        value: handleNumber(transaction[7]),
-        data: transaction[8],
-        chainId: handleNumber(transaction[9]).toNumber(),
+        nonce: handleNumber(transaction[0] as string),
+        gasPrice: handleBigInt(transaction[1] as string),
+        gasLimit: handleBigInt(transaction[2] as string),
+        feeCurrency: handleAddress(transaction[3] as string),
+        gatewayFeeRecipient: handleAddress(transaction[4] as string),
+        gatewayFee: handleBigInt(transaction[5] as string),
+        to: handleAddress(transaction[6] as string),
+        value: handleBigInt(transaction[7] as string),
+        data: transaction[8] as string,
+        chainId: handleBigInt(transaction[9] as string),
       } as LegacyCeloTransaction;
       break;
   }
@@ -405,51 +426,49 @@ export function parseCeloTransaction(
     return tx;
   }
 
+  let v: number;
   try {
-    tx.v = handleNumber(transaction.at(-3)).toNumber();
+    v = handleNumber(transaction.at(-3) as string);
   } catch (error) {
     console.log(error);
     return tx;
   }
 
-  tx.r = utils.hexZeroPad(transaction.at(-2), 32);
-  tx.s = utils.hexZeroPad(transaction.at(-1), 32);
+  const r = zeroPadValue(transaction.at(-2) as string, 32);
+  const s = zeroPadValue(transaction.at(-1) as string, 32);
 
   // EIP-155 unsigned transaction
-  if (handleNumber(tx.r).isZero() && handleNumber(tx.s).isZero()) {
+  if (handleBigInt(r) === 0n && handleBigInt(s) === 0n) {
     if (!type) {
-      tx.chainId = tx.v;
-      tx.v = 0;
+      tx.chainId = v;
+      v = 0;
     }
   }
   // Signed Transaction
   else {
-    let recoveryParam = tx.v;
+    let recoveryParam = v;
     if (!type) {
       // celo-legacy
-      tx.chainId = Math.max(0, Math.floor((tx.v - EIP155_NUMBER) / 2));
-      recoveryParam = tx.v - Y_PARITY_EIP_2098;
+      tx.chainId = Math.max(0, Math.floor((v - EIP155_NUMBER) / 2));
+      recoveryParam = v - Y_PARITY_EIP_2098;
       recoveryParam -= tx.chainId * 2 + EIGHT;
     }
 
     // NOTE: Serialization needs to happen here because chainId may not populated before
-    const serialized = serializeCeloTransaction(
-      omit(tx, "v", "r", "s") as CeloTransactionRequest
-    );
-    const digest = utils.keccak256(serialized);
+    const serialized = serializeCeloTransaction(tx);
+    const digest = keccak256(serialized);
 
     try {
-      // TODO there may be an issue here with incorrect from address extraction
-      tx.from = utils.recoverAddress(digest, {
-        r: utils.hexlify(tx.r),
-        s: utils.hexlify(tx.s),
-        recoveryParam,
+      tx.from = recoverAddress(digest, {
+        r,
+        s,
+        yParity: recoveryParam as 0 | 1,
       });
     } catch (error) {
       console.log(error);
     }
 
-    tx.hash = utils.keccak256(rawTransaction);
+    tx.hash = keccak256(rawTransaction);
   }
 
   return tx;
@@ -460,17 +479,24 @@ function handleAddress(value: string): string | undefined {
     return undefined;
   }
   try {
-    return utils.getAddress(value);
+    return getAddress(value);
   } catch (error) {
     return value;
   }
 }
 
-function handleNumber(value: string): BigNumber {
+function handleNumber(value: string): number {
   if (value === "0x") {
-    return constants.Zero;
+    return 0;
   }
-  return BigNumber.from(value);
+  return getNumber(value);
+}
+
+function handleBigInt(value: string): bigint {
+  if (value === "0x") {
+    return 0n;
+  }
+  return getBigInt(value);
 }
 
 function handleAccessList(value: string): AccessListish | "0x" {
@@ -487,7 +513,7 @@ const baseTxLengths = {
   "celo-legacy": { unsigned: 12, signed: 12 },
 } as const;
 
-function isSigned(type: TxTypeToPrefix, transaction: string[]) {
+function isSigned(type: TxTypeToPrefix, transaction: RlpStructuredData[]) {
   if (type) {
     const { signed } = baseTxLengths[type];
     return transaction.length === signed;
@@ -498,18 +524,21 @@ function isSigned(type: TxTypeToPrefix, transaction: string[]) {
   return r !== "0x" && s !== "0x";
 }
 
-function isCorrectLength(type: TxTypeToPrefix, transaction: string[]) {
+function isCorrectLength(
+  type: TxTypeToPrefix,
+  transaction: RlpStructuredData[]
+) {
   const { unsigned } = baseTxLengths[type || "celo-legacy"];
   return transaction.length === unsigned || isSigned(type, transaction);
 }
 
 function splitTypeAndRawTx(
-  rawTransaction: utils.BytesLike
-): [TxTypeToPrefix | undefined, any[]] {
+  rawTransaction: BytesLike
+): [TxTypeToPrefix | undefined, RlpStructuredData[]] {
   let rawStr = rawTransaction.toString();
   let type: TxTypeToPrefix | undefined;
   for (const _type of [TxTypeToPrefix.cip64, TxTypeToPrefix.eip1559]) {
-    const prefix = utils.hexlify(_type);
+    const prefix = toBeHex(_type);
     if (rawStr.startsWith(prefix)) {
       rawStr = `0x${rawStr.slice(prefix.length)}`;
       type = _type;
@@ -517,13 +546,12 @@ function splitTypeAndRawTx(
     }
   }
 
-  const transaction = utils.RLP.decode(rawStr);
+  const transaction = decodeRlp(rawStr) as RlpStructuredData[];
   if (!isCorrectLength(type!, transaction)) {
-    logger.throwArgumentError(
-      "invalid raw transaction",
-      "{type, rawTransaction}",
-      { type: type!, rawTransaction }
-    );
+    assertArgument(false, "invalid raw transaction", "{type, rawTransaction}", {
+      type: type!,
+      rawTransaction,
+    });
   }
 
   return [type!, transaction];

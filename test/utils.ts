@@ -1,5 +1,5 @@
-import { CeloProvider } from "../src/lib/CeloProvider";
-import { CeloWallet } from "../src/lib/CeloWallet";
+import CeloProvider from "../src/lib/CeloProvider";
+import CeloWallet from "../src/lib/CeloWallet";
 import { ALFAJORES_FORNO, CELO_DERIVATION_PATH } from "./consts";
 
 export function getSigner() {
