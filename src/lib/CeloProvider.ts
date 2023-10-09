@@ -93,9 +93,6 @@ export default class CeloProvider extends JsonRpcProvider {
     );
   }
 
-  // Overrides
-  // https://github.com/ethers-io/ethers.js/blob/main/lib.esm/providers/abstract-provider.js#L716-L730
-  // Just changes the tx parsing.
   async broadcastTransaction(signedTx: string): Promise<TransactionResponse> {
     const { hash } = await resolveProperties({
       blockNumber: this.getBlockNumber(),
