@@ -1,8 +1,4 @@
-import // Contract,
-// TransactionResponse
-"ethers";
 import { CUSD_ADDRESS } from "./consts";
-// import { STABLE_TOKEN_ABI } from "./stableToken";
 import { getSigner } from "./utils";
 import { Contract, TransactionResponse } from "ethers";
 import { STABLE_TOKEN_ABI } from "./stableToken";
