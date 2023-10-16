@@ -21,8 +21,6 @@ import {
   serializeCeloTransaction,
 } from "./transactions";
 
-// const logger = new utils.Logger("CeloWallet");
-
 const forwardErrors = [
   "INSUFFICIENT_FUNDS",
   "NONCE_EXPIRED",
