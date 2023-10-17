@@ -41,5 +41,6 @@
     "!**/*.json",
     "LICENSE",
     "README.md"
-  ]
+  ],
+  "packageManager": "yarn@3.6.1"
 }
