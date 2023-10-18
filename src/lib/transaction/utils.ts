@@ -1,16 +1,14 @@
-import { BigNumber, BigNumberish } from "ethers";
-import { hexlify } from "ethers/lib/utils";
+import { hexlify, BigNumberish, isBytesLike, toBeHex } from "ethers";
 import { GAS_INFLATION_FACTOR } from "../../consts";
 
 function isEmpty(value: string | BigNumberish | undefined | null) {
-  return (
-    value === undefined ||
-    value === null ||
-    value === "0" ||
-    (typeof value == "string"
-      ? value.toLowerCase() === "0x" || value.toLowerCase() === "0x0"
-      : hexlify(value) === "0x0")
-  );
+  if (value === undefined || value === null || value === "0" || value === 0n) {
+    return true;
+  }
+  if (isBytesLike(value)) {
+    return hexlify(value) === "0x0";
+  }
+  return toBeHex(value) === "0x0";
 }
 
 function isPresent(value: string | BigNumberish | undefined | null) {
@@ -57,7 +55,7 @@ export function omit<T extends Object, K extends (keyof T)[]>(
     }, {} as T);
 }
 
-export function adjustForGasInflation(gas: BigNumber): BigNumber {
+export function adjustForGasInflation(gas: bigint): bigint {
   // NOTE: prevent floating point math
-  return gas.mul(Math.floor(GAS_INFLATION_FACTOR * 100)).div(100);
+  return (gas * GAS_INFLATION_FACTOR) / 100n;
 }

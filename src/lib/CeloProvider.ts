@@ -1,128 +1,116 @@
-import { BigNumber, providers, utils } from "ethers";
-import { getNetwork } from "./networks";
+import {
+  JsonRpcProvider,
+  PerformActionRequest,
+  TransactionResponse,
+  TransactionResponseParams,
+  getBigInt,
+  resolveProperties,
+  toBeHex,
+} from "ethers";
 import { CeloTransactionRequest, parseCeloTransaction } from "./transactions";
 
-const logger = new utils.Logger("CeloProvider");
-
-export class CeloProvider extends providers.JsonRpcProvider {
-  /**
-   * Override to parse transaction correctly
-   * https://github.com/ethers-io/ethers.js/blob/master/packages/providers/src.ts/base-provider.ts
-   */
-  async sendTransaction(
-    signedTransaction: string | Promise<string>
-  ): Promise<providers.TransactionResponse> {
-    await this.getNetwork();
-    const hexTx = await Promise.resolve(signedTransaction).then((t) =>
-      utils.hexlify(t)
-    );
-    const tx = parseCeloTransaction(hexTx);
-    const blockNumber = await this._getInternalBlockNumber(
-      100 + 2 * this.pollingInterval
-    );
-    try {
-      const hash = await this.perform("sendTransaction", {
-        signedTransaction: hexTx,
-      });
-      return this._wrapTransaction(tx, hash, blockNumber);
-    } catch (error) {
-      (<any>error).transaction = tx;
-      (<any>error).transactionHash = tx.hash;
-      throw error;
+export default class CeloProvider extends JsonRpcProvider {
+  async _perform(req: PerformActionRequest): Promise<any> {
+    // Legacy networks do not like the type field being passed along (which
+    // is fair), so we delete type if it is 0 and a non-EIP-1559 network
+    if (req.method === "call" || req.method === "estimateGas") {
+      let tx = req.transaction;
+      if (tx && tx.type != null && getBigInt(tx.type)) {
+        // If there are no EIP-1559 properties, it might be non-EIP-1559
+        if (tx.maxFeePerGas == null && tx.maxPriorityFeePerGas == null) {
+          const feeData = await this.getFeeData();
+          if (
+            feeData.maxFeePerGas == null &&
+            feeData.maxPriorityFeePerGas == null
+          ) {
+            // Network doesn't know about EIP-1559 (and hence type)
+            req = Object.assign({}, req, {
+              transaction: Object.assign({}, tx, { type: undefined }),
+            });
+          }
+        }
+      }
     }
-  }
 
-  /**
-   * Override to handle alternative gas currencies
-   * getGasPrice in https://github.com/ethers-io/ethers.js/blob/master/packages/providers/src.ts/base-provider.ts
-   */
-  async getGasPrice(feeCurrencyAddress?: string) {
-    await this.getNetwork();
-    const params = feeCurrencyAddress ? { feeCurrencyAddress } : {};
-    return BigNumber.from(await this.perform("getGasPrice", params));
+    const request = this.getRpcRequest(req);
+
+    if (request != null) {
+      return await this.send(request.method, request.args);
+    }
+
+    return super._perform(req);
   }
 
   /**
    * Override to handle alternative gas currencies
    * prepareRequest in https://github.com/ethers-io/ethers.js/blob/master/packages/providers/src.ts/json-rpc-provider.ts
    */
-  prepareRequest(method: any, params: any): [string, Array<any>] {
-    if (method === "getGasPrice") {
-      const param = params.feeCurrencyAddress
-        ? [params.feeCurrencyAddress]
+  getRpcRequest(
+    req: PerformActionRequest
+  ): null | { method: string; args: Array<any> } {
+    if (req.method === "getGasPrice") {
+      // @ts-expect-error
+      const param = req.feeCurrencyAddress
+        ? // @ts-expect-error
+          [req.feeCurrencyAddress]
         : [];
-      return ["eth_gasPrice", param];
+      return { method: "eth_gasPrice", args: param };
     }
 
-    if (method === "estimateGas") {
-      // NOTE: somehow estimategas trims lots of fields
-      // this overrides it
+    if (req.method === "estimateGas") {
       const extraneous_keys = [
         ["from", (x: string) => x],
-        ["feeCurrency", utils.hexlify],
+        ["feeCurrency", (x: string) => x],
         ["gatewayFeeRecipient", (x: string) => x],
-        ["gatewayFee", utils.hexlify],
+        ["gatewayFee", toBeHex],
       ] as const;
 
       const tx = {
-        ...providers.JsonRpcProvider.hexlifyTransaction(
-          params.transaction,
-          extraneous_keys.reduce((acc, [key]) => {
-            acc[key] = true;
-            return acc;
-          }, {} as Record<string, true>)
-        ),
+        ...this.getRpcTransaction(req.transaction),
       };
       extraneous_keys.forEach(([key, fn]) => {
-        if (params.transaction[key]) {
-          tx[key] = fn(params.transaction[key]);
+        // @ts-expect-error
+        if (req.transaction[key]) {
+          // @ts-expect-error
+          tx[key] = fn(req.transaction[key]);
         }
       });
 
-      return ["eth_estimateGas", [tx]];
+      return { method: "eth_estimateGas", args: [tx] };
     }
 
-    return super.prepareRequest(method, params);
+    return super.getRpcRequest(req);
   }
 
-  static getNetwork(networkish: providers.Networkish): providers.Network {
-    const network = getNetwork(networkish == null ? "celo" : networkish);
-    if (network == null) {
-      return logger.throwError(
-        `unknown network: ${JSON.stringify(network)}`,
-        utils.Logger.errors.UNSUPPORTED_OPERATION,
-        {
-          operation: "getNetwork",
-          value: networkish,
-        }
-      );
-    }
-    return network;
+  async estimateGas(_tx: CeloTransactionRequest): Promise<bigint> {
+    return getBigInt(
+      await this._perform({
+        method: "estimateGas",
+        // @ts-ignore
+        transaction: _tx,
+      }),
+      "%response"
+    );
   }
 
-  async estimateGas(
-    transaction: utils.Deferrable<CeloTransactionRequest>
-  ): Promise<BigNumber> {
-    // NOTE: Overrides the ethers method to make sure feeCurrency and from are sent
-    // to the rpc node
-    await this.getNetwork();
-    const params = await utils.resolveProperties({
-      transaction,
+  // Overrides
+  // https://github.com/ethers-io/ethers.js/blob/main/lib.esm/providers/abstract-provider.js#L716-L730
+  // Just changes the tx parsing.
+  async broadcastTransaction(signedTx: string): Promise<TransactionResponse> {
+    const { hash } = await resolveProperties({
+      blockNumber: this.getBlockNumber(),
+      hash: this._perform({
+        method: "broadcastTransaction",
+        signedTransaction: signedTx,
+      }),
+      network: this.getNetwork(),
     });
-    const result = await this.perform("estimateGas", params);
-    try {
-      return BigNumber.from(result);
-    } catch (error) {
-      return logger.throwError(
-        "bad result from backend",
-        utils.Logger.errors.SERVER_ERROR,
-        {
-          method: "estimateGas",
-          params,
-          result,
-          error,
-        }
-      );
+
+    const tx = parseCeloTransaction(signedTx);
+    if (tx.hash !== hash) {
+      throw new Error("@TODO: the returned hash did not match");
     }
+
+    return new TransactionResponse(tx as TransactionResponseParams, this);
   }
 }
