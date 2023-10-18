@@ -1,6 +1,6 @@
 # celo-ethers-wrapper
 
-A minimal wrapper to make Ethers.JS compatible with the Celo network.
+Initially, the Celo network was not fully compatible with Ethers.JS. Since the Donut hard-fork in 2021, Ethereum tools can now be used with Celo without the need for a wrapper. However, Celo transactions have optional, additional fields that enable useful features like paying with stable tokens. This library enables the use of those extra fields.
 
 ## Install
 
@@ -10,11 +10,11 @@ or
 
 `yarn add @celo-tools/celo-ethers-wrapper`
 
-Note this wrapper has Ethers v5 as a peer dependency. Your project must include a dependency on that as well.
+Note this wrapper has Ethers as a peer dependency. **Use celo-ethers-wrapper v1 versions for Ethers V5 and v2 versions for Ethers V6.**
 
 ## Basic Usage
 
-Connect to the network by creating a `CeloProvider`, which is based on [JsonRpc-Provider](https://docs.ethers.io/v5/api/providers/jsonrpc-provider/):
+Connect to the network by creating a `CeloProvider`, which is based on [JsonRpc-Provider](https://docs.ethers.org/v6/api/providers/jsonrpc):
 
 ```js
 import { CeloProvider } from '@celo-tools/celo-ethers-wrapper'
@@ -24,9 +24,7 @@ const provider = new CeloProvider('https://alfajores-forno.celo-testnet.org')
 await provider.ready
 ```
 
-Note: for a more efficient provider based on [StaticJsonRpcProvider](https://docs.ethers.io/v5/api/providers/jsonrpc-provider/#StaticJsonRpcProvider) you can use `StaticCeloProvider` instead.
-
-Next, Create a CeloWallet, which is based on [Wallet](https://docs.ethers.io/v5/api/signer/#Wallet) :
+Next, Create a CeloWallet, which is based on [Wallet](https://docs.ethers.org/v6/api/wallet) :
 
 ```js
 import { CeloWallet } from '@celo-tools/celo-ethers-wrapper'
