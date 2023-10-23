@@ -1,7 +1,7 @@
 import { test, expect } from "@jest/globals";
 import { getSigner } from "./common";
 import { Contract, ContractFactory } from "ethers";
-import HelloWorldContract from "../test/HelloWorld";
+import HelloWorldContract from "./HelloWorld";
 import { BLOCK_TIME } from "./consts";
 
 let contract: ReturnType<ContractFactory["deploy"]>;
