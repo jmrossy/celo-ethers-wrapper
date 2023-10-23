@@ -1,6 +1,6 @@
 import { test, expect } from "@jest/globals";
 import { CeloscanProvider } from "../src/lib/CeloscanProvider";
-import { getAccount } from "./common";
+import { getAccount, getSigner } from "./common";
 
 test("can fetch an account's history", async () => {
   const account = getAccount();
@@ -11,4 +11,9 @@ test("can fetch an account's history", async () => {
   const history = await provider.getHistory(account!);
 
   expect(history.length).toBeGreaterThan(0);
+});
+
+test("can fetch an account's balance", async () => {
+  const balance = await getSigner().provider?.getBalance(getAccount());
+  expect(balance).toBeGreaterThan(0);
 });

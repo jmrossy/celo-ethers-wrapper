@@ -1,26 +1,28 @@
 import { test, expect, describe } from "@jest/globals";
 import { getSigner } from "./common";
-import { BLOCK_TIME } from "./consts";
+import { BLOCK_TIME, CUSD_ADDRESS } from "./consts";
 import RegistryABI from "@celo/abis/Registry.json";
 import type { Registry, StableToken } from "@celo/abis/types/ethers";
 import StableTokenABI from "@celo/abis/StableToken.json";
 import { Contract } from "ethers";
 
 const signer = getSigner();
-const CUSD_ADDRESS: Promise<string> = new Promise(async (resolve) => {
-  const REGISTRY_ADDRESS = "0x000000000000000000000000000000000000ce10";
-  const registry = new Contract(
-    REGISTRY_ADDRESS,
-    RegistryABI.abi,
-    signer
-  ) as unknown as Registry;
-  const cUSDAddress = await registry.getAddressForString("StableToken");
-  resolve(cUSDAddress);
-});
+const CUSD_ADDRESS_FROM_REGISTRY: Promise<string> = new Promise(
+  async (resolve) => {
+    const REGISTRY_ADDRESS = "0x000000000000000000000000000000000000ce10";
+    const registry = new Contract(
+      REGISTRY_ADDRESS,
+      RegistryABI.abi,
+      signer
+    ) as unknown as Registry;
+    const cUSDAddress = await registry.getAddressForString("StableToken");
+    resolve(cUSDAddress);
+  }
+);
 
-test("can get cUSD address", async () => {
-  const address = await CUSD_ADDRESS;
-  expect(address).toMatch(/0x.{40}/);
+test("can get cUSD address from registry", async () => {
+  const address = await CUSD_ADDRESS_FROM_REGISTRY;
+  expect(address).toEqual(CUSD_ADDRESS);
 });
 
 test("can fetch balance", async () => {
@@ -56,7 +58,7 @@ describe("[celo-legacy]", () => {
       const txResponse = await signer.sendTransaction({
         to: signer.address,
         value: 1n,
-        feeCurrency: await CUSD_ADDRESS,
+        feeCurrency: CUSD_ADDRESS,
       });
       const txReceipt = await txResponse.wait();
       expect(txReceipt?.hash).toMatch(/0x.{40}/);
@@ -72,7 +74,7 @@ describe("[cip-64]", () => {
       const txResponse = await signer.sendTransaction({
         to: signer.address,
         value: 1n,
-        feeCurrency: await CUSD_ADDRESS,
+        feeCurrency: CUSD_ADDRESS,
         maxFeePerGas: 5000000000n,
         maxPriorityFeePerGas: 5000000000n,
       });
@@ -104,7 +106,7 @@ describe("cUSD contract", () => {
     "can cUSD directly with the cUSD contract",
     async () => {
       const stableToken = new Contract(
-        await CUSD_ADDRESS,
+        CUSD_ADDRESS,
         StableTokenABI.abi,
         signer
       ) as unknown as StableToken;
