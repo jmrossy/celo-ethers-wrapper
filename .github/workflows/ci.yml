@@ -2,7 +2,8 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [master, main]
+    # so they run on the fork for now
+    # branches: [master, main]
 jobs:
   build:
     runs-on: ubuntu-latest
