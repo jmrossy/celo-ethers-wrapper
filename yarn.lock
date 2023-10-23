@@ -419,6 +419,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@celo-tools/celo-ethers-wrapper@workspace:."
   dependencies:
+    "@celo/abis": latest
     "@jest/globals": ^29.7.0
     "@types/node": ^20.8.2
     ethers: ^6.7.1
@@ -430,6 +431,13 @@ __metadata:
     ethers: ^6
   languageName: unknown
   linkType: soft
+
+"@celo/abis@npm:latest":
+  version: 9.0.6
+  resolution: "@celo/abis@npm:9.0.6"
+  checksum: f273116e8bb7e1e79829faaa0825f57280e415ba747d874598b6c58ae5f6664b0c3f1f5560ce5f54bfe2d2e5dc8a574e67be7f946dbb81fd44da913799231843
+  languageName: node
+  linkType: hard
 
 "@cspotcode/source-map-support@npm:^0.8.0":
   version: 0.8.1

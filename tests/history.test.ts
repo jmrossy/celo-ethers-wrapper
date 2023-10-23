@@ -1,8 +1,9 @@
 import { test, expect } from "@jest/globals";
 import { CeloscanProvider } from "../src/lib/CeloscanProvider";
+import { getAccount } from "./common";
 
 test("can fetch an account's history", async () => {
-  const account = process.env.ACCOUNT;
+  const account = getAccount();
   expect(account).not.toBeUndefined();
 
   const network = process.env.NETWORK?.toLocaleLowerCase() || "celo";

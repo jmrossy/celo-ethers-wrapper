@@ -12,3 +12,7 @@ export function getSigner() {
   ).connect(provider);
   return wallet;
 }
+
+export function getAccount() {
+  return getSigner().address;
+}
