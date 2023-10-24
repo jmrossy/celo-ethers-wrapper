@@ -1,4 +1,4 @@
-import { test, expect } from "@jest/globals";
+import { expect, test } from "@jest/globals";
 import { CeloscanProvider } from "../src/lib/CeloscanProvider";
 import { getAccount, getSigner } from "./common";
 
@@ -7,6 +7,7 @@ test("can fetch an account's history", async () => {
   expect(account).not.toBeUndefined();
 
   const network = process.env.NETWORK?.toLocaleLowerCase() || "celo";
+  console.log(`Getting history for account ${account} on network ${network}`);
   const provider = new CeloscanProvider(network);
   const history = await provider.getHistory(account!);
 

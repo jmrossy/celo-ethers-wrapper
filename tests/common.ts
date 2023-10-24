@@ -10,6 +10,7 @@ export function getSigner() {
     mnemonic,
     CELO_DERIVATION_PATH
   ).connect(provider);
+  console.log("Using account", wallet.address);
   return wallet;
 }
 
