@@ -49,7 +49,7 @@ describe("[celo-legacy]", () => {
       const txReceipt = await txResponse.wait();
       expect(txReceipt?.hash).toMatch(/0x.{40}/);
     },
-    BLOCK_TIME * 2
+    BLOCK_TIME * 3
   );
 
   test(
@@ -63,7 +63,7 @@ describe("[celo-legacy]", () => {
       const txReceipt = await txResponse.wait();
       expect(txReceipt?.hash).toMatch(/0x.{40}/);
     },
-    BLOCK_TIME * 2
+    BLOCK_TIME * 3
   );
 });
 
@@ -81,7 +81,7 @@ describe("[cip-64]", () => {
       const txReceipt = await txResponse.wait();
       expect(txReceipt?.hash).toMatch(/0x.{40}/);
     },
-    BLOCK_TIME * 2
+    BLOCK_TIME * 3
   );
 });
 describe("[eip-1559]", () => {
@@ -97,7 +97,7 @@ describe("[eip-1559]", () => {
       const txReceipt = await txResponse.wait();
       expect(txReceipt?.hash).toMatch(/0x.{40}/);
     },
-    BLOCK_TIME * 2
+    BLOCK_TIME * 3
   );
 });
 
@@ -114,6 +114,6 @@ describe("cUSD contract", () => {
       const txReceipt = await txResponse.wait();
       expect(txReceipt?.hash).toMatch(/0x.{40}/);
     },
-    BLOCK_TIME * 2
+    BLOCK_TIME * 3
   );
 });
