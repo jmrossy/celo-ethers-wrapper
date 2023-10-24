@@ -17,17 +17,17 @@
     "build": "yarn build:main && yarn build:module",
     "build:main": "tsc -p tsconfig.json",
     "build:module": "tsc -p tsconfig.module.json",
-    "test": "yarn test:contract && yarn test:deploy && yarn test:history",
-    "test:contract": "ts-node test/useContract.ts",
-    "test:deploy": "ts-node test/deployContract.ts",
-    "test:history": "ts-node test/getHistory.ts"
+    "test": "jest ./tests"
   },
   "engines": {
     "node": ">=10"
   },
   "devDependencies": {
+    "@jest/globals": "^29.7.0",
     "@types/node": "^20.8.2",
     "ethers": "^6.7.1",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1",
     "ts-node": "^10.9.1",
     "typescript": "^5.2.2"
   },
@@ -42,5 +42,8 @@
     "LICENSE",
     "README.md"
   ],
-  "packageManager": "yarn@3.6.1"
+  "packageManager": "yarn@3.6.1",
+  "dependencies": {
+    "@celo/abis": "latest"
+  }
 }

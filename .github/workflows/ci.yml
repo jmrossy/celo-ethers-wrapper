@@ -1,0 +1,21 @@
+name: CI
+on:
+  pull_request:
+  push:
+    # so they run on the fork for now
+    # branches: [master, main]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+
+      - name: Install modules
+        run: yarn
+
+      - name: Run tests
+        run: yarn test --runInBand
+        env:
+          MNEMONIC: ${{ secrets.MNEMONIC }}
+          NETWORK: alfajores
