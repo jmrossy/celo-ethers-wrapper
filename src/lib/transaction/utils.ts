@@ -19,6 +19,9 @@ export function isEIP1559(tx: any): boolean {
   return isPresent(tx.maxFeePerGas) && isPresent(tx.maxPriorityFeePerGas);
 }
 
+/**
+ * TODO(Arthur): Fix duplicate condition here.
+ */
 export function isCIP64(tx: any) {
   return (
     isEIP1559(tx) &&
@@ -28,6 +31,9 @@ export function isCIP64(tx: any) {
   );
 }
 
+/**
+ * TODO(Arthur): Remove CIP42 support
+ */
 export function isCIP42(tx: any): boolean {
   return (
     isEIP1559(tx) &&

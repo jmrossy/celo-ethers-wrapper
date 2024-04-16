@@ -40,6 +40,10 @@ export interface CeloTransactionCip64 extends TransactionLike {
 export interface CeloTransactionEip1559 extends TransactionLike {
   type: TxTypeToPrefix.eip1559;
 }
+
+/**
+ * TODO(Arthur): Celo legacy transaction is deprecated
+ */
 export interface LegacyCeloTransaction extends TransactionLike {
   type: undefined;
   gasPrice: bigint;
@@ -63,6 +67,10 @@ interface Field {
   length?: number;
   numeric?: true;
 }
+
+/**
+ * TODO(Arthur): gatewayFee and gatewayFeeRecipient are not supported anymore
+ */
 export const celoAllowedTransactionKeys = {
   type: true,
   chainId: true,
@@ -80,6 +88,9 @@ export const celoAllowedTransactionKeys = {
   accessList: true,
 } as const;
 
+/**
+ * TODO(Arthur): gatewayFee and gatewayFeeRecipient are not supported anymore
+ */
 type CeloFieldName =
   | keyof Omit<
       CeloTransactionRequest,
@@ -100,6 +111,9 @@ type CeloFieldName =
   | "gatewayFeeRecipient"
   | "gatewayFee";
 
+/**
+ * TODO(Arthur): gatewayFee and gatewayFeeRecipient are not supported anymore
+ */
 export const celoTransactionFields: Record<CeloFieldName, Field> = {
   nonce: { maxLength: 32, numeric: true } as Field,
   gasPrice: { maxLength: 32, numeric: true } as Field,
@@ -159,6 +173,10 @@ function formatCeloField(name: CeloFieldName, value: any) {
   return hexlify(_value);
 }
 
+/**
+ * TODO(Arthur): gatewayFee and gatewayFeeRecipient are not supported anymore.
+ * Check what should happen here.
+ */
 export function getTxType(tx: CeloTransaction) {
   if (isCIP64(tx)) {
     // @ts-ignore
@@ -223,6 +241,9 @@ function prepareEncodeTx(
       ];
       break;
     default:
+        /**
+         * TODO(Arthur): gatewayFee and gatewayFeeRecipient are not supported anymore
+         */
       // This order should match the order in Geth.
       // https://github.com/celo-org/celo-blockchain/blob/027dba2e4584936cc5a8e8993e4e27d28d5247b8/core/types/transaction.go#L65
       raw = [
@@ -406,6 +427,9 @@ export function parseCeloTransaction(
       } as CeloTransactionEip1559;
       break;
     default:
+        /**
+         * TODO(Arthur): gatewayFee and gatewayFeeRecipient are not supported anymore
+         */
       tx = {
         nonce: handleNumber(transaction[0] as string),
         gasPrice: handleBigInt(transaction[1] as string),

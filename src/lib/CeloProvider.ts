@@ -57,6 +57,9 @@ export default class CeloProvider extends JsonRpcProvider {
       return { method: "eth_gasPrice", args: param };
     }
 
+    /**
+     * TODO(Arthur): gatewayFee and gatewayFeeRecipient are not supported anymore
+     */
     if (req.method === "estimateGas") {
       const extraneous_keys = [
         ["from", (x: string) => x],
