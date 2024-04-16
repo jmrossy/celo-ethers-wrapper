@@ -20,7 +20,7 @@
     "test": "jest ./tests"
   },
   "engines": {
-    "node": ">=10"
+    "node": ">=18.14.2"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
