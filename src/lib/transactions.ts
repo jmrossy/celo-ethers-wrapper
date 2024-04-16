@@ -26,6 +26,9 @@ import {
 import { concatHex, isCIP64, isEIP1559 } from "./transaction/utils";
 import { EIGHT, EIP155_NUMBER, Y_PARITY_EIP_2098 } from "../consts";
 
+/**
+ * TODO(Arthur): gatewayFee and gatewayFeeRecipient are deprecated
+ */
 export interface CeloTransactionRequest extends TransactionRequest {
   feeCurrency?: string;
   gatewayFeeRecipient?: string;
