@@ -31,6 +31,15 @@ test("can fetch balance", async () => {
 });
 
 describe("[celo-legacy]", () => {
+    /**
+     * TODO(Arthur): Delete or modify this test. 
+     * Should not make celo legacy transaction anymore.
+     * 
+     * Consider asserting that fallback option is used.
+     * Consider asserting that type is not 0x0 and ethCompatible is not false. 
+     * 
+     * Context: https://forum.celo.org/t/action-required-celo-legacy-tx-type-deprecation/7804
+     */
   test(
     "can transfer CELO",
     async () => {
