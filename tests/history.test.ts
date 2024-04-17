@@ -1,5 +1,13 @@
-import { expect, test } from "@jest/globals";
+import { describe, expect, test } from "@jest/globals";
 import { CeloscanProvider } from "../src/lib/CeloscanProvider";
+import {
+    ADDRESS_WITH_MAINNET_TRANSACTION_HISTORY,
+    ADDRESS_WITH_ALFAJORES_TRANSACTION_HISTORY,
+    ADDRESS_WITH_BAKLAVA_TRANSACTION_HISTORY,
+    CELOSCAN_PROVIDER_MAINNET_NETWORK_NAME, 
+    CELOSCAN_PROVIDER_ALFAJORES_NETWORK_NAME,
+    CELOSCAN_PROVIDER_BAKLAVA_NETWORK_NAME
+} from "./consts";
 import { getAccount, getSigner } from "./common";
 
 /**
@@ -13,32 +21,48 @@ import { getAccount, getSigner } from "./common";
  * Might not be necessary to change order of execution, but re-evaluate what this
  * test asserts. Seems Celoscan specific.
  */
-test("can fetch an account's history", async () => {
-  const account = getAccount();
-  expect(account).not.toBeUndefined();
+describe(`can fetch an account's "normal" transaction history`, () => {
+    test("on Celo Mainnet", async () => {
+        const address = ADDRESS_WITH_MAINNET_TRANSACTION_HISTORY;
+        const network = CELOSCAN_PROVIDER_MAINNET_NETWORK_NAME;
 
-  const network = process.env.NETWORK?.toLocaleLowerCase() || "celo";
-  console.log(`Getting history for account ${account} on network ${network}`);
-  const provider = new CeloscanProvider(network);
-  /**
-   * TODO(Arthur): `getHistory` makes a request to the `txlist` 
-   * API endpoint. 
-   * 
-   * The call returns 
-   *
-   * > the list of transactions performed by an address, with optional pagination. 
-   * 
-   * Endpoint is called "Get a list of 'Normal' Transactions By Address"
-   * 
-   * Source: https://docs.celoscan.io/api-endpoints/accounts#get-a-list-of-normal-transactions-by-address
-   * 
-   * That means incoming ERC20 transfers, say from a faucet, are not included here.
-   * Only "normal" transactions made by the address are included.
-   */
-  const history = await provider.getHistory(account!);
+        expect(address).not.toBeUndefined();
+        expect(network).not.toBeUndefined();
+      
+        console.log(`Getting list of 'normal' transactions by address for ${address} on ${network}`);
+        const provider = new CeloscanProvider(network);
+        const history = await provider.getHistory(address!);
+      
+        expect(history.length).toBeGreaterThan(0);
+      });
 
-  expect(history.length).toBeGreaterThan(0);
-});
+    test("on Alfajores testnet", async () => {
+      const address = ADDRESS_WITH_ALFAJORES_TRANSACTION_HISTORY;
+      const network = CELOSCAN_PROVIDER_ALFAJORES_NETWORK_NAME;
+
+      expect(address).not.toBeUndefined();
+      expect(network).not.toBeUndefined();
+    
+      console.log(`Getting list of 'normal' transactions by address for ${address} on ${network}`);
+      const provider = new CeloscanProvider(network);
+      const history = await provider.getHistory(address!);
+    
+      expect(history.length).toBeGreaterThan(0);
+    });
+
+    test("on Baklava testnet", async () => {
+      const address = ADDRESS_WITH_BAKLAVA_TRANSACTION_HISTORY;
+      const network = CELOSCAN_PROVIDER_BAKLAVA_NETWORK_NAME;
+
+      expect(address).not.toBeUndefined();
+      expect(network).not.toBeUndefined();
+    
+      console.log(`Getting list of 'normal' transactions by address for ${address} on ${network}`);
+      const provider = new CeloscanProvider(network);
+      const history = await provider.getHistory(address!);
+    
+      expect(history.length).toBeGreaterThan(0);
+    });
 
 test("can fetch an account's balance", async () => {
   const balance = await getSigner().provider?.getBalance(getAccount());
