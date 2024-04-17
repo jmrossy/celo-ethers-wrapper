@@ -64,7 +64,15 @@ describe(`can fetch an account's "normal" transaction history`, () => {
       expect(history.length).toBeGreaterThan(0);
     });
 
-test("can fetch an account's balance", async () => {
-  const balance = await getSigner().provider?.getBalance(getAccount());
-  expect(balance).toBeGreaterThan(0);
+})
+
+describe("can fetch an account's balance", () => {
+  test("on Alfajores testnet", async () => {
+    const address = getAccount();
+
+    console.log(`Getting balance for ${address} on Alfajores testnet`);
+    const balance = await getSigner().provider?.getBalance(getAccount());
+
+    expect(balance).toBeGreaterThan(0);
+  });
 });
