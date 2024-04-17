@@ -10,17 +10,6 @@ import {
 } from "./consts";
 import { getAccount, getSigner } from "./common";
 
-/**
- * TODO(Arthur): Ensure this test runs sequentially after a transfer or transaction has been 
- * triggered in a test suite run or the test runs on an address that is known to have transactions.
- * 
- * Otherwise a brand new wallet with no transaction history will fail this test.
- * 
- * This test currently fails with my newly initialised and fauceted account.
- * 
- * Might not be necessary to change order of execution, but re-evaluate what this
- * test asserts. Seems Celoscan specific.
- */
 describe(`can fetch an account's "normal" transaction history`, () => {
     test("on Celo Mainnet", async () => {
         const address = ADDRESS_WITH_MAINNET_TRANSACTION_HISTORY;
