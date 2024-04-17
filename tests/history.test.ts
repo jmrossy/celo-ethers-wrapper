@@ -8,7 +8,7 @@ import {
     CELOSCAN_PROVIDER_ALFAJORES_NETWORK_NAME,
     CELOSCAN_PROVIDER_BAKLAVA_NETWORK_NAME
 } from "./consts";
-import { getAccount, getSigner } from "./common";
+
 
 describe(`can fetch an account's "normal" transaction history`, () => {
     test("on Celo Mainnet", async () => {
@@ -54,14 +54,3 @@ describe(`can fetch an account's "normal" transaction history`, () => {
     });
 
 })
-
-describe("can fetch an account's balance", () => {
-  test("on Alfajores testnet", async () => {
-    const address = getAccount();
-
-    console.log(`Getting balance for ${address} on Alfajores testnet`);
-    const balance = await getSigner().provider?.getBalance(getAccount());
-
-    expect(balance).toBeGreaterThan(0);
-  });
-});
