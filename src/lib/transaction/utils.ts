@@ -27,7 +27,7 @@ export function isCIP64(tx: any) {
     isEIP1559(tx) &&
     isPresent(tx.feeCurrency) &&
     !isPresent(tx.gatewayFeeRecipient) &&
-    !isPresent(tx.gatewayFeeRecipient)
+    !isPresent(tx.gatewayFee)
   );
 }
 
