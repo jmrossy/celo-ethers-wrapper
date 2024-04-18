@@ -4,7 +4,12 @@ export const CELO_DERIVATION_PATH = "m/44'/52752'/0'/0/0";
 export const HELLO_WORLD_ADDRESS = "0x21F637331830096a1fc6115c3dB9382fef4343Bf";
 export const CUSD_ADDRESS = "0x874069Fa1Eb16D44d622F2e0Ca25eeA172369bC1";
 
-export const CIP64_TRANSACTION_TYPE_NUMBER = 123;
+export enum TxTypeNumber {
+  CIP64 = 123,
+  EIP1559 = 2,
+  ACCESS_LIST = 1,
+  ETHEREUM_LEGACY = 0,
+}
 
 // Source: https://www.circle.com/en/multi-chain-usdc/celo
 export const USDC_ALFAJORES_ADDRESS = "0x2F25deB3848C207fc8E0c34035B3Ba7fC157602B";
