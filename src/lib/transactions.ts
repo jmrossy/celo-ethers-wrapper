@@ -44,7 +44,8 @@ export interface CeloTransactionEip1559 extends TransactionLike {
 
 export type CeloTransaction =
   | CeloTransactionCip64
-  | CeloTransactionEip1559;
+  | CeloTransactionEip1559
+  | TransactionLike;
 
 export enum TxTypeToPrefix {
   cip64 = 0x7b,
@@ -204,7 +205,7 @@ function prepareEncodeTx(
         tx.data || "0x",
         // @ts-expect-error
         tx.accessList || [],
-        tx.feeCurrency || "0x",
+        (tx as CeloTransactionCip64).feeCurrency || "0x",
       ];
       break;
     case TxTypeToPrefix.eip1559:
@@ -226,16 +227,19 @@ function prepareEncodeTx(
     default:
         /**
          * TODO(Arthur): gatewayFee and gatewayFeeRecipient are not supported anymore
+         * 
+         * Should this fall back to Ethereum type 0 transaction?
+         * 
+         * At the moment, this doesn't support type 1 Ethereum comp
          */
+      
       // This order should match the order in Geth.
       // https://github.com/celo-org/celo-blockchain/blob/027dba2e4584936cc5a8e8993e4e27d28d5247b8/core/types/transaction.go#L65
+      // Effectively it's rlp([nonce, gasprice, gaslimit, recipient, amount, data, v, r, s])
       raw = [
         toBeHex(tx.nonce!),
         tx.gasPrice ? toBeHex(tx.gasPrice) : "0x",
         tx.gasLimit ? toBeHex(tx.gasLimit) : "0x",
-        tx.feeCurrency || "0x",
-        tx.gatewayFeeRecipient || "0x",
-        tx.gatewayFee ? toBeHex(tx.gatewayFee) : "0x",
         tx.to || "0x",
         tx.value ? toBeHex(tx.value) : "0x",
         tx.data || "0x",
@@ -412,24 +416,34 @@ export function parseCeloTransaction(
     default:
         /**
          * TODO(Arthur): gatewayFee and gatewayFeeRecipient are not supported anymore
+         * 
+         * I'm not certain the logic below is sound. I need to write additional tests to 
+         * make sure this is an appropriate "default".
+         * 
+         * In particular, I wonder how type 1 (Access List) transactions would work?
+         * Is that a case I don't need to worry about, because they should be 
+         * type 2 (EIP-1559) by default?
+         * 
+         * Type 0 Ethereum legacy transaction:
+         * RLP([nonce, gasprice, gaslimit, recipient, amount, data, chaindId, 0, 0])
          */
       tx = {
         nonce: handleNumber(transaction[0] as string),
         gasPrice: handleBigInt(transaction[1] as string),
         gasLimit: handleBigInt(transaction[2] as string),
-        feeCurrency: handleAddress(transaction[3] as string),
-        gatewayFeeRecipient: handleAddress(transaction[4] as string),
-        gatewayFee: handleBigInt(transaction[5] as string),
-        to: handleAddress(transaction[6] as string),
-        value: handleBigInt(transaction[7] as string),
-        data: transaction[8] as string,
-        chainId: handleBigInt(transaction[9] as string),
-      } as LegacyCeloTransaction;
+        to: handleAddress(transaction[3] as string),
+        value: handleBigInt(transaction[4] as string),
+        data: transaction[5] as string,
+        chainId: handleBigInt(transaction[6] as string),
+      } as TransactionLike; // TODO(Arthur): Is that the correct type for Ethereum-compatible transactions?
       break;
   }
 
+  /**
+   * TODO(Arthur): Is there anything to do here now that we are removing Celo Legacy transaction?
+   */
   // Legacy unsigned transaction
-  if (!isSigned(type!, transaction)) {
+  if (!isSigned(type!, transaction)) { 
     return tx;
   }
 
@@ -517,7 +531,12 @@ function handleAccessList(value: string): AccessListish | "0x" {
 const baseTxLengths = {
   [TxTypeToPrefix.cip64]: { unsigned: 10, signed: 13 },
   [TxTypeToPrefix.eip1559]: { unsigned: 9, signed: 12 },
-  "celo-legacy": { unsigned: 12, signed: 12 },
+  /**
+   * Unsigned: RLP([nonce, gasprice, gaslimit, recipient, amount, data, chaindId, 0, 0])
+   * Signed: RLP([nonce, gasprice, gaslimit, recipient, amount, data, v, r, s])
+   * Source: https://github.com/celo-org/txtypes?tab=readme-ov-file#legacy-transactions
+   */
+  "ethereum-legacy": { unsigned: 9, signed: 9 },
 } as const;
 
 function isSigned(type: TxTypeToPrefix, transaction: RlpStructuredData[]) {
@@ -535,7 +554,7 @@ function isCorrectLength(
   type: TxTypeToPrefix,
   transaction: RlpStructuredData[]
 ) {
-  const { unsigned } = baseTxLengths[type || "celo-legacy"];
+  const { unsigned } = baseTxLengths[type || "ethereum-legacy"];
   return transaction.length === unsigned || isSigned(type, transaction);
 }
 
