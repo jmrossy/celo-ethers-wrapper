@@ -75,8 +75,52 @@ describe("[celo-legacy]", () => {
     BLOCK_TIME * 3
   );
 });
+// describe("[celo-legacy]", () => {
+//     /**
+//      * TODO(Arthur): Delete or modify this test.
+//      * Should not make celo legacy transaction anymore.
+//      *
+//      * Consider asserting that fallback option is used.
+//      * Consider asserting that type is not 0x0 and ethCompatible is not false.
+//      *
+//      * Context: https://forum.celo.org/t/action-required-celo-legacy-tx-type-deprecation/7804
+//      */
+//   test(
+//     "can transfer CELO",
+//     async () => {
+//       const txResponse = await signer.sendTransaction({
+//         to: signer.address,
+//         value: 1n,
+//       });
 
-describe("[cip-64]", () => {
+//       // Or, alternatively, break apart signing and sending:
+//       // const signedTx = await signer.signTransaction({
+//       //   to: signer.address,
+//       //   value: 1n,
+//       // });
+//       // const provider = signer.provider;
+//       // const txResponse = await provider.sendTransaction(signedTx);
+//       const txReceipt = await txResponse.wait();
+//       expect(txReceipt?.hash).toMatch(/0x.{40}/);
+//     },
+//     BLOCK_TIME * 3
+//   );
+
+//   test(
+//     "can transfer CELO using cUSD as feeCurrency",
+//     async () => {
+//       const txResponse = await signer.sendTransaction({
+//         to: signer.address,
+//         value: 1n,
+//         feeCurrency: USDC_ALFAJORES_ADDRESS, // TODO(Arthur): Replace with USDC
+//       });
+//       const txReceipt = await txResponse.wait();
+//       expect(txReceipt?.hash).toMatch(/0x.{40}/);
+//     },
+//     BLOCK_TIME * 3
+//   );
+// });
+
     test("can transfer USDC with USDC as feeCurrency", async () => {
         /**
          * TODO(Arthur): This test is incomplete. At the moment, it doesn't
