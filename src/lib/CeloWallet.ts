@@ -45,6 +45,18 @@ export default class CeloWallet extends Wallet {
     }
 
     const type = getTxType(tx);
+    /**
+     * TODO(Arthur): `getTxType` currently returns:
+     * 
+     * 1. 123 (CIP64)
+     * 2. 2 (EIP1559)
+     * 3. "" (default)
+     * 
+     * Type 0 is handled by the if statement below, but what about type 1 (access list)?
+     * 
+     * Seems like we only want to support access list transactions as type 2, and not type 1.
+     * Probably makes sense, just a note to confirm.
+     */
     if (!type && tx.gasPrice == null) {
       tx.gasPrice = this.getGasPrice();
     }
