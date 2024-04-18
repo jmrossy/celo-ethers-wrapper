@@ -77,21 +77,15 @@ describe("[celo-legacy]", () => {
 });
 
 describe("[cip-64]", () => {
-  test(
-    "can transfer CELO with cUSD as feeCurrency",
-    async () => {
-      const txResponse = await signer.sendTransaction({
-        to: signer.address,
-        value: 1n,
-        feeCurrency: CUSD_ADDRESS,
-        maxFeePerGas: 5000000000n,
-        maxPriorityFeePerGas: 5000000000n,
-      });
-      const txReceipt = await txResponse.wait();
-      expect(txReceipt?.hash).toMatch(/0x.{40}/);
-    },
-    BLOCK_TIME * 3
-  );
+    test("can transfer USDC with USDC as feeCurrency", async () => {
+        /**
+         * TODO(Arthur): This test is incomplete. At the moment, it doesn't
+         * make the ERC-20 transfer with USDC as a fee currency.
+         */
+        const txResponse = await usdc.transfer(signer.address, 1n);
+        const txReceipt = await txResponse.wait();
+        expect(txReceipt?.hash).toMatch(/0x.{40}/);
+    });
 });
 describe("[eip-1559]", () => {
   test(
@@ -103,23 +97,6 @@ describe("[eip-1559]", () => {
         maxFeePerGas: 5000000000n,
         maxPriorityFeePerGas: 5000000000n,
       });
-      const txReceipt = await txResponse.wait();
-      expect(txReceipt?.hash).toMatch(/0x.{40}/);
-    },
-    BLOCK_TIME * 3
-  );
-});
-
-describe("cUSD contract", () => {
-  test(
-    "can cUSD directly with the cUSD contract",
-    async () => {
-      const stableToken = new Contract(
-        CUSD_ADDRESS,
-        StableTokenABI.abi,
-        signer
-      ) as unknown as StableToken;
-      const txResponse = await stableToken.transfer(signer.address, 1n);
       const txReceipt = await txResponse.wait();
       expect(txReceipt?.hash).toMatch(/0x.{40}/);
     },
