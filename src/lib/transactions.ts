@@ -31,8 +31,6 @@ import { EIGHT, EIP155_NUMBER, Y_PARITY_EIP_2098 } from "../consts";
  */
 export interface CeloTransactionRequest extends TransactionRequest {
   feeCurrency?: string;
-  gatewayFeeRecipient?: string;
-  gatewayFee?: bigint;
 }
 
 export interface CeloTransactionCip64 extends TransactionLike {
@@ -44,19 +42,7 @@ export interface CeloTransactionEip1559 extends TransactionLike {
   type: TxTypeToPrefix.eip1559;
 }
 
-/**
- * TODO(Arthur): Celo legacy transaction is deprecated
- */
-export interface LegacyCeloTransaction extends TransactionLike {
-  type: undefined;
-  gasPrice: bigint;
-  feeCurrency: string;
-  gatewayFeeRecipient: string;
-  gatewayFee: bigint;
-}
-
 export type CeloTransaction =
-  | LegacyCeloTransaction
   | CeloTransactionCip64
   | CeloTransactionEip1559;
 
@@ -84,8 +70,6 @@ export const celoAllowedTransactionKeys = {
   to: true,
   value: true,
   feeCurrency: true,
-  gatewayFeeRecipient: true,
-  gatewayFee: true,
   maxFeePerGas: true,
   maxPriorityFeePerGas: true,
   accessList: true,
@@ -110,9 +94,7 @@ type CeloFieldName =
       | "blockTag"
       | "enableCcipRead"
     >
-  | "feeCurrency"
-  | "gatewayFeeRecipient"
-  | "gatewayFee";
+  | "feeCurrency";
 
 /**
  * TODO(Arthur): gatewayFee and gatewayFeeRecipient are not supported anymore
@@ -122,8 +104,6 @@ export const celoTransactionFields: Record<CeloFieldName, Field> = {
   gasPrice: { maxLength: 32, numeric: true } as Field,
   gasLimit: { maxLength: 32, numeric: true } as Field,
   feeCurrency: { length: 20 } as Field,
-  gatewayFeeRecipient: { length: 20 } as Field,
-  gatewayFee: { maxLength: 32, numeric: true } as Field,
   to: { length: 20 } as Field,
   value: { maxLength: 32, numeric: true } as Field,
   data: {} as Field,
