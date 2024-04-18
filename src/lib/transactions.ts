@@ -158,18 +158,19 @@ function formatCeloField(name: CeloFieldName, value: any) {
 
 /**
  * TODO(Arthur): gatewayFee and gatewayFeeRecipient are not supported anymore.
- * Check what should happen here.
+ * 
+ * The first if statement seems redundant:
+ * 
+ * 1. if `isCIP64(tx)` is true, then
+ *    1. there cannot be a tx.gatewayFee,
+ *    2. there cannot be a tx.gatewayFeeRecipient
+ *    3. there cannot be a tx.gasPrice
  */
 export function getTxType(tx: CeloTransaction) {
   if (isCIP64(tx)) {
-    // @ts-ignore
-    delete tx.gatewayFee;
-    // @ts-ignore
-    delete tx.gatewayFeeRecipient;
-    // @ts-ignore
-    delete tx.gasPrice;
     return TxTypeToPrefix.cip64;
-  } else if (isEIP1559(tx)) {
+  }
+  if (isEIP1559(tx)) {
     // @ts-ignore
     delete tx.feeCurrency;
     // @ts-ignore
@@ -179,9 +180,8 @@ export function getTxType(tx: CeloTransaction) {
     // @ts-ignore
     delete tx.gasPrice;
     return TxTypeToPrefix.eip1559;
-  } else {
-    return "";
   }
+  return "";
 }
 
 function prepareEncodeTx(
