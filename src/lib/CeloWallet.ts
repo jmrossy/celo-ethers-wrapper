@@ -13,12 +13,13 @@ import {
   Wordlist,
 } from "ethers";
 import CeloProvider from "./CeloProvider";
-import { adjustForGasInflation } from "./transaction/utils";
+import { adjustForGasInflation, isPresent } from "./transaction/utils";
 import {
   CeloTransaction,
   CeloTransactionRequest,
   getTxType,
   serializeCeloTransaction,
+  TxTypeToPrefix,
 } from "./transactions";
 
 const forwardErrors = [
@@ -45,18 +46,7 @@ export default class CeloWallet extends Wallet {
     }
 
     const type = getTxType(tx);
-    /**
-     * TODO(Arthur): `getTxType` currently returns:
-     * 
-     * 1. 123 (CIP64)
-     * 2. 2 (EIP1559)
-     * 3. "" (default)
-     * 
-     * Type 0 is handled by the if statement below, but what about type 1 (access list)?
-     * 
-     * Seems like we only want to support access list transactions as type 2, and not type 1.
-     * Probably makes sense, just a note to confirm.
-     */
+    
     if (!type && tx.gasPrice == null) {
       tx.gasPrice = this.getGasPrice();
     }
@@ -81,6 +71,14 @@ export default class CeloWallet extends Wallet {
           }
         );
       });
+    }
+
+    if (type === TxTypeToPrefix.cip64
+      && (!isPresent(tx.maxPriorityFeePerGas) || !isPresent(tx.maxFeePerGas))
+    ) {
+      const { maxFeePerGas, maxPriorityFeePerGas } = (await (this.provider as CeloProvider)?.getFeeData(tx.feeCurrency))!;
+      tx.maxFeePerGas = maxFeePerGas;
+      tx.maxPriorityFeePerGas = maxPriorityFeePerGas;
     }
 
     if (tx.chainId == null) {
