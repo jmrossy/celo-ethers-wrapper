@@ -23,12 +23,9 @@ import {
   TransactionRequest,
   zeroPadValue,
 } from "ethers";
-import { concatHex, isCIP64, isEIP1559 } from "./transaction/utils";
+import { concatHex, isCIP64, isEIP1559, isFeeCurrency } from "./transaction/utils";
 import { EIGHT, EIP155_NUMBER, Y_PARITY_EIP_2098 } from "../consts";
 
-/**
- * TODO(Arthur): gatewayFee and gatewayFeeRecipient are deprecated
- */
 export interface CeloTransactionRequest extends TransactionRequest {
   feeCurrency?: string;
 }
@@ -76,9 +73,6 @@ export const celoAllowedTransactionKeys = {
   accessList: true,
 } as const;
 
-/**
- * TODO(Arthur): gatewayFee and gatewayFeeRecipient are not supported anymore
- */
 type CeloFieldName =
   | keyof Omit<
       CeloTransactionRequest,
@@ -97,9 +91,6 @@ type CeloFieldName =
     >
   | "feeCurrency";
 
-/**
- * TODO(Arthur): gatewayFee and gatewayFeeRecipient are not supported anymore
- */
 export const celoTransactionFields: Record<CeloFieldName, Field> = {
   nonce: { maxLength: 32, numeric: true } as Field,
   gasPrice: { maxLength: 32, numeric: true } as Field,
@@ -169,6 +160,12 @@ function formatCeloField(name: CeloFieldName, value: any) {
  */
 export function getTxType(tx: CeloTransaction) {
   if (isCIP64(tx)) {
+    return TxTypeToPrefix.cip64;
+  }
+  /**
+   * TODO(Arthur): Refactor isCIP64 and isFeeCurrency
+   */
+  if (isFeeCurrency(tx)) {
     return TxTypeToPrefix.cip64;
   }
   if (isEIP1559(tx)) {

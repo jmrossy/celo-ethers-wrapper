@@ -11,7 +11,7 @@ function isEmpty(value: string | BigNumberish | undefined | null) {
   return toBeHex(value) === "0x0";
 }
 
-function isPresent(value: string | BigNumberish | undefined | null) {
+export function isPresent(value: string | BigNumberish | undefined | null) {
   return !isEmpty(value);
 }
 
@@ -20,7 +20,7 @@ export function isEIP1559(tx: any): boolean {
 }
 
 /**
- * TODO(Arthur): Fix duplicate condition here.
+ * TODO(Arthur): Fix overlapping isCIP64 and isFeeCurrency
  */
 export function isCIP64(tx: any) {
   return (
@@ -32,15 +32,18 @@ export function isCIP64(tx: any) {
 }
 
 /**
- * TODO(Arthur): Remove CIP42 support
+ * Identifies transactions that specify the `feeCurrency` field, but are not yet EIP-1559,
+ * because they don't specify `maxPriorityFeePerGas`, `maxFeePerGas`, and `gasLimit`.
+ * 
+ * @param tx object with transaction parameters 
+ * @returns true if `feeCurrency` field is specified, false otherwise.
  */
-export function isCIP42(tx: any): boolean {
+export function isFeeCurrency(tx: any): boolean {
   return (
-    isEIP1559(tx) &&
-    (isPresent(tx.feeCurrency) ||
-      isPresent(tx.gatewayFeeRecipient) ||
-      isPresent(tx.gatewayFee))
-  );
+    isPresent(tx.feeCurrency) &&
+    !isPresent(tx.gatewayFeeRecipient) &&
+    !isPresent(tx.gatewayFee)
+  )
 }
 
 export function concatHex(values: string[]): `0x${string}` {
