@@ -52,9 +52,6 @@ export default class CeloProvider extends JsonRpcProvider {
             return { method: "eth_gasPrice", args: param };
         }
 
-        /**
-         * TODO(Arthur): gatewayFee and gatewayFeeRecipient are not supported anymore
-         */
         if (req.method === "estimateGas") {
             const extraneous_keys = [
                 ["from", (x: string) => x],
@@ -96,7 +93,6 @@ export default class CeloProvider extends JsonRpcProvider {
         const maxPriorityFeePerGas = getBigInt(
             await this.send("eth_maxPriorityFeePerGas", [feeCurrency])
         );
-        // TODO(Arthur): handle errors using try-catch
         const { baseFeePerGas } = (await this.getBlock("latest", false))!
         const gasPrice = null;
         const maxFeePerGas = baseFeePerGas! * 2n + maxPriorityFeePerGas;

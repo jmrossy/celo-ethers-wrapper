@@ -19,9 +19,6 @@ export function isEIP1559(tx: any): boolean {
   return isPresent(tx.maxFeePerGas) && isPresent(tx.maxPriorityFeePerGas);
 }
 
-/**
- * TODO(Arthur): Fix overlapping isCIP64 and isFeeCurrency
- */
 export function isCIP64(tx: any) {
   return (
     isEIP1559(tx) &&

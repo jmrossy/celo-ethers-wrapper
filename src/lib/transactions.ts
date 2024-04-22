@@ -55,9 +55,6 @@ interface Field {
   numeric?: true;
 }
 
-/**
- * TODO(Arthur): gatewayFee and gatewayFeeRecipient are not supported anymore
- */
 export const celoAllowedTransactionKeys = {
   type: true,
   chainId: true,
@@ -148,23 +145,10 @@ function formatCeloField(name: CeloFieldName, value: any) {
   return hexlify(_value);
 }
 
-/**
- * TODO(Arthur): gatewayFee and gatewayFeeRecipient are not supported anymore.
- * 
- * The first if statement seems redundant:
- * 
- * 1. if `isCIP64(tx)` is true, then
- *    1. there cannot be a tx.gatewayFee,
- *    2. there cannot be a tx.gatewayFeeRecipient
- *    3. there cannot be a tx.gasPrice
- */
 export function getTxType(tx: CeloTransaction) {
   if (isCIP64(tx)) {
     return TxTypeToPrefix.cip64;
   }
-  /**
-   * TODO(Arthur): Refactor isCIP64 and isFeeCurrency
-   */
   if (isFeeCurrency(tx)) {
     return TxTypeToPrefix.cip64;
   }
@@ -222,17 +206,8 @@ function prepareEncodeTx(
       ];
       break;
     default:
-        /**
-         * TODO(Arthur): gatewayFee and gatewayFeeRecipient are not supported anymore
-         * 
-         * Should this fall back to Ethereum type 0 transaction?
-         * 
-         * At the moment, this doesn't support type 1 Ethereum comp
-         */
-      
-      // This order should match the order in Geth.
-      // https://github.com/celo-org/celo-blockchain/blob/027dba2e4584936cc5a8e8993e4e27d28d5247b8/core/types/transaction.go#L65
-      // Effectively it's rlp([nonce, gasprice, gaslimit, recipient, amount, data, v, r, s])
+      // Type 0 Ethereum legacy transaction:
+      // rlp([nonce, gasprice, gaslimit, recipient, amount, data, v, r, s])
       raw = [
         toBeHex(tx.nonce!),
         tx.gasPrice ? toBeHex(tx.gasPrice) : "0x",
@@ -412,15 +387,6 @@ export function parseCeloTransaction(
       break;
     default:
         /**
-         * TODO(Arthur): gatewayFee and gatewayFeeRecipient are not supported anymore
-         * 
-         * I'm not certain the logic below is sound. I need to write additional tests to 
-         * make sure this is an appropriate "default".
-         * 
-         * In particular, I wonder how type 1 (Access List) transactions would work?
-         * Is that a case I don't need to worry about, because they should be 
-         * type 2 (EIP-1559) by default?
-         * 
          * Type 0 Ethereum legacy transaction:
          * RLP([nonce, gasprice, gaslimit, recipient, amount, data, chaindId, 0, 0])
          */
@@ -432,13 +398,10 @@ export function parseCeloTransaction(
         value: handleBigInt(transaction[4] as string),
         data: transaction[5] as string,
         chainId: handleBigInt(transaction[6] as string),
-      } as TransactionLike; // TODO(Arthur): Is that the correct type for Ethereum-compatible transactions?
+      } as TransactionLike;
       break;
   }
 
-  /**
-   * TODO(Arthur): Is there anything to do here now that we are removing Celo Legacy transaction?
-   */
   // Legacy unsigned transaction
   if (!isSigned(type!, transaction)) { 
     return tx;
