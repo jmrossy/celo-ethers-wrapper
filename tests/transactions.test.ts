@@ -1,8 +1,9 @@
 import { test, expect, describe } from "@jest/globals";
 import { getSigner, getTransactionByHash, MINIMAL_USDC_ABI } from "./common";
 import { BLOCK_TIME, USDC_ADAPTER_ALFAJORES_ADDRESS, USDC_ALFAJORES_ADDRESS } from "./consts";
-import { Contract } from "ethers";
+import { Contract, ContractFactory } from "ethers";
 import { TxTypeToPrefix } from "../src/lib/transactions";
+import HelloWorldContract from "./HelloWorld";
 
 const signer = getSigner();
 const usdc = new Contract(USDC_ALFAJORES_ADDRESS, MINIMAL_USDC_ABI, signer);
@@ -33,30 +34,30 @@ describe("[setup] supplied wallet has sufficient tokens to run tests", () => {
 
 describe("[ethereum-compatibility] when sending a transaction with gas in CELO, then the transaction is always Ethereum-compatible", () => {
     test(
-      "can transfer CELO with CELO as gas",
-      async () => {
-          const txResponse = await signer.sendTransaction({
-              to: signer.address,
-              value: BigInt(1),
-              maxFeePerGas: BigInt(10e9) * BigInt(2) + BigInt(10e9), // ( base fee * 2 ) + tip
-              maxPriorityFeePerGas: BigInt(10e9),
-          });
-          const txReceipt = await txResponse.wait();
-          expect(txReceipt).not.toBeNull();
-          const jsonRpcResponse = await getTransactionByHash(txReceipt!.hash);
+        "can transfer CELO with CELO as gas",
+        async () => {
+            const txResponse = await signer.sendTransaction({
+                to: signer.address,
+                value: BigInt(1),
+                maxFeePerGas: BigInt(5e9) * BigInt(2) + BigInt(100e9), // ( base fee * 2 ) + tip
+                maxPriorityFeePerGas: BigInt(100e9),
+            });
+            const txReceipt = await txResponse.wait();
+            expect(txReceipt).not.toBeNull();
+            const jsonRpcResponse = await getTransactionByHash(txReceipt!.hash);
 
-          expect(jsonRpcResponse?.result.ethCompatible).toBe(true); // transaction is ethereum-compatible
-          expect(txReceipt?.type).toEqual(TxTypeToPrefix.eip1559); // transaction is EIP1559
-          expect(txReceipt?.hash).toMatch(/0x.{40}/); // transaction is successful
-      },
-      BLOCK_TIME * 3
-  );
+            expect(jsonRpcResponse?.result.ethCompatible).toBe(true); // transaction is ethereum-compatible
+            expect(txReceipt?.type).toEqual(TxTypeToPrefix.eip1559); // transaction is EIP1559
+            expect(txReceipt?.hash).toMatch(/0x.{40}/); // transaction is successful
+        },
+        BLOCK_TIME * 3
+    );
     test(
         "can transfer CELO with CELO as gas, and estimate gas parameters",
         async () => {
             const txResponse = await signer.sendTransaction({
                 to: signer.address,
-                value: 1n,
+                value: BigInt(1),
             });
             const txReceipt = await txResponse.wait();
             expect(txReceipt).not.toBeNull();
@@ -138,6 +139,49 @@ describe("[fee currency support] when sending transactions with gas in fee curre
              * ```
              */
             expect(txReceipt?.type).toEqual(TxTypeToPrefix.cip64);
+            expect(txReceipt?.hash).toMatch(/0x.{40}/);
+        },
+        BLOCK_TIME * 3
+    );
+});
+
+describe("Contract deployment", () => {
+    let contract: ReturnType<ContractFactory["deploy"]>;
+    async function deployContract() {
+        if (contract) return contract;
+
+        contract = new Promise(async (resolve) => {
+            const signer = getSigner();
+            const factory = new ContractFactory(
+                HelloWorldContract.abi,
+                HelloWorldContract.bytecode,
+                signer
+            );
+            resolve(await factory.deploy());
+        });
+
+        return contract;
+    }
+
+    test(
+        "can deploy a contract",
+        async () => {
+            const contract = await deployContract();
+            const receipt = await contract.deploymentTransaction()?.wait();
+            expect(receipt?.contractAddress).toMatch(/0x.{40}/);
+        },
+        BLOCK_TIME * 3
+    );
+
+    test(
+        "can call a function on a newly deployedContract",
+        async () => {
+            const contract = await deployContract();
+            await contract.deploymentTransaction()?.wait();
+
+            const txResponse = await (contract as Contract).setName("myName");
+            const txReceipt = await txResponse.wait();
+
             expect(txReceipt?.hash).toMatch(/0x.{40}/);
         },
         BLOCK_TIME * 3
