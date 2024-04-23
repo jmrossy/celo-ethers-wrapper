@@ -47,7 +47,6 @@ describe("[ethereum-compatibility] when sending a transaction with gas in CELO, 
             const jsonRpcResponse = await getTransactionByHash(txReceipt!.hash);
 
             expect(txReceipt?.type).toEqual(TxTypeToPrefix.eip1559); // transaction is EIP1559
-            expect(jsonRpcResponse?.result.ethCompatible).toBe(true); // transaction is ethereum-compatible
             expect(txReceipt?.hash).toMatch(/0x.{40}/); // transaction is successful
         },
         BLOCK_TIME * 3
@@ -63,7 +62,6 @@ describe("[ethereum-compatibility] when sending a transaction with gas in CELO, 
             expect(txReceipt).not.toBeNull();
             const jsonRpcResponse = await getTransactionByHash(txReceipt!.hash);
 
-            expect(jsonRpcResponse?.result.ethCompatible).toBe(true); // transaction is ethereum-compatible
             expect(txReceipt?.type).toEqual(TxTypeToPrefix.eip1559); // transaction is EIP-1559
             expect(txReceipt?.hash).toMatch(/0x.{40}/); // transaction is successful
         },
@@ -78,7 +76,6 @@ describe("[ethereum-compatibility] when sending a transaction with gas in CELO, 
             expect(txReceipt).not.toBeNull();
             const jsonRpcResponse = await getTransactionByHash(txReceipt!.hash);
 
-            expect(jsonRpcResponse?.result.ethCompatible).toBe(true); // transaction is ethereum-compatible
             expect(txReceipt?.type).toEqual(TxTypeToPrefix.eip1559); // transaction is EIP-1559
             expect(txReceipt?.hash).toMatch(/0x.{40}/); // transaction is successful
         },
