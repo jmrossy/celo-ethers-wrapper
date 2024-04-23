@@ -55,7 +55,7 @@ After installing the dependencies, the project is ready to be run.
     MNEMONIC='<PASTE YOUR MNEMONIC PHRASE HERE>'
     ```
 
-3.  Ensure the wallet address has at least [X] CELO and [X] USDC on the Celo Alfajores testnet. 
+3.  Ensure the wallet address has at least 1 CELO and 1 USDC on the Celo Alfajores testnet. 
 
     If you need more, you can request:
     1.  testnet CELO at [faucet.celo.org](https://faucet.celo.org/alfajores), and 
