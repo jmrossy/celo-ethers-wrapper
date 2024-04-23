@@ -23,7 +23,7 @@ import {
   TransactionRequest,
   zeroPadValue,
 } from "ethers";
-import { concatHex, isCIP64, isEIP1559, isFeeCurrency } from "./transaction/utils";
+import { concatHex, isCIP64 } from "./transaction/utils";
 import { EIGHT, EIP155_NUMBER, Y_PARITY_EIP_2098 } from "../consts";
 
 export interface CeloTransactionRequest extends TransactionRequest {
@@ -39,10 +39,7 @@ export interface CeloTransactionEip1559 extends TransactionLike {
   type: TxTypeToPrefix.eip1559;
 }
 
-export type CeloTransaction =
-  | CeloTransactionCip64
-  | CeloTransactionEip1559
-  | TransactionLike;
+export type CeloTransaction = CeloTransactionCip64 | CeloTransactionEip1559 | TransactionLike;
 
 export enum TxTypeToPrefix {
   cip64 = 0x7b,
@@ -116,29 +113,15 @@ function formatCeloField(name: CeloFieldName, value: any) {
   let _value = toBeArray(value);
 
   // Fixed-width field
-  if (
-    fieldInfo.length &&
-    _value.length !== fieldInfo.length &&
-    _value.length > 0
-  ) {
-    assertArgument(
-      false,
-      "invalid length for " + name,
-      "transaction:" + name,
-      _value
-    );
+  if (fieldInfo.length && _value.length !== fieldInfo.length && _value.length > 0) {
+    assertArgument(false, "invalid length for " + name, "transaction:" + name, _value);
   }
 
   // Variable-width (with a maximum)
   if (fieldInfo.maxLength) {
     _value = toBeArray(stripZerosLeft(_value));
     if (_value.length > fieldInfo.maxLength) {
-      assertArgument(
-        false,
-        "invalid length for " + name,
-        "transaction:" + name,
-        _value
-      );
+      assertArgument(false, "invalid length for " + name, "transaction:" + name, _value);
     }
   }
 
@@ -146,30 +129,16 @@ function formatCeloField(name: CeloFieldName, value: any) {
 }
 
 export function getTxType(tx: CeloTransaction) {
+  if (tx.gasPrice) {
+    return "";
+  }
   if (isCIP64(tx)) {
     return TxTypeToPrefix.cip64;
   }
-  if (isFeeCurrency(tx)) {
-    return TxTypeToPrefix.cip64;
-  }
-  if (isEIP1559(tx)) {
-    // @ts-ignore
-    delete tx.feeCurrency;
-    // @ts-ignore
-    delete tx.gatewayFee;
-    // @ts-ignore
-    delete tx.gatewayFeeRecipient;
-    // @ts-ignore
-    delete tx.gasPrice;
-    return TxTypeToPrefix.eip1559;
-  }
-  return "";
+  return TxTypeToPrefix.eip1559;
 }
 
-function prepareEncodeTx(
-  tx: CeloTransaction,
-  signature?: Signature
-): RlpStructuredData {
+function prepareEncodeTx(tx: CeloTransaction, signature?: Signature): RlpStructuredData {
   let raw: RlpStructuredData[] = [];
   switch (tx.type) {
     case TxTypeToPrefix.cip64:
@@ -244,25 +213,16 @@ export function serializeCeloTransaction(
 ): string {
   Object.keys(transaction).forEach((property) => {
     if (!(property in celoAllowedTransactionKeys)) {
-      assertArgument(
-        false,
-        "unknown property",
-        "serializeCeloTransaction",
-        property
-      );
+      assertArgument(false, "unknown property", "serializeCeloTransaction", property);
     }
   });
 
-  const txArgs: Partial<Record<keyof CeloTransaction, string | Uint8Array>> =
-    {};
+  const txArgs: Partial<Record<keyof CeloTransaction, string | Uint8Array>> = {};
 
   Object.entries(transaction).forEach(([fieldName, fieldValue]) => {
     if (fieldName in celoTransactionFields) {
       // @ts-expect-error
-      txArgs[fieldName as CeloFieldName] = formatCeloField(
-        fieldName as CeloFieldName,
-        fieldValue
-      );
+      txArgs[fieldName as CeloFieldName] = formatCeloField(fieldName as CeloFieldName, fieldValue);
     }
   });
 
@@ -272,19 +232,9 @@ export function serializeCeloTransaction(
     chainId = parseInt(transaction.chainId.toString(16), 16);
 
     if (typeof chainId !== "number") {
-      assertArgument(
-        false,
-        "invalid transaction.chainId",
-        "transaction",
-        transaction
-      );
+      assertArgument(false, "invalid transaction.chainId", "transaction", transaction);
     }
-  } else if (
-    signature &&
-    !isBytesLike(signature) &&
-    signature.v &&
-    getNumber(signature.v) > 28
-  ) {
+  } else if (signature && !isBytesLike(signature) && signature.v && getNumber(signature.v) > 28) {
     // No chainId provided, but the signature is signing with EIP-155; derive chainId
     chainId = Math.floor((getNumber(signature.v) - EIP155_NUMBER) / 2);
   }
@@ -323,20 +273,10 @@ export function serializeCeloTransaction(
 
       // If an EIP-155 v (directly or indirectly; maybe _vs) was provided, check it!
       if (sig.v > Y_PARITY_EIP_2098 + 1 && sig.v !== v) {
-        assertArgument(
-          false,
-          "transaction.chainId/signature.v mismatch",
-          "signature",
-          signature
-        );
+        assertArgument(false, "transaction.chainId/signature.v mismatch", "signature", signature);
       }
     } else if (sig.v !== v) {
-      assertArgument(
-        false,
-        "transaction.chainId/signature.v mismatch",
-        "signature",
-        signature
-      );
+      assertArgument(false, "transaction.chainId/signature.v mismatch", "signature", signature);
     }
   }
 
@@ -348,9 +288,7 @@ export function serializeCeloTransaction(
 
 // Based on https://github.com/ethers-io/ethers.js/blob/0234cfbbef76b7f7a53efe4c434cc6d8892bf404/packages/transactions/src.ts/index.ts#L165
 // Need to override to use the celo tx prop whitelists above
-export function parseCeloTransaction(
-  rawTransaction: BytesLike
-): CeloTransaction {
+export function parseCeloTransaction(rawTransaction: BytesLike): CeloTransaction {
   const [type, transaction] = splitTypeAndRawTx(rawTransaction);
 
   let tx: CeloTransaction;
@@ -386,10 +324,10 @@ export function parseCeloTransaction(
       } as CeloTransactionEip1559;
       break;
     default:
-        /**
-         * Type 0 Ethereum legacy transaction:
-         * RLP([nonce, gasprice, gaslimit, recipient, amount, data, chaindId, 0, 0])
-         */
+      /**
+       * Type 0 Ethereum legacy transaction:
+       * RLP([nonce, gasprice, gaslimit, recipient, amount, data, chaindId, 0, 0])
+       */
       tx = {
         nonce: handleNumber(transaction[0] as string),
         gasPrice: handleBigInt(transaction[1] as string),
@@ -403,7 +341,7 @@ export function parseCeloTransaction(
   }
 
   // Legacy unsigned transaction
-  if (!isSigned(type!, transaction)) { 
+  if (!isSigned(type!, transaction)) {
     return tx;
   }
 
@@ -510,10 +448,7 @@ function isSigned(type: TxTypeToPrefix, transaction: RlpStructuredData[]) {
   return r !== "0x" && s !== "0x";
 }
 
-function isCorrectLength(
-  type: TxTypeToPrefix,
-  transaction: RlpStructuredData[]
-) {
+function isCorrectLength(type: TxTypeToPrefix, transaction: RlpStructuredData[]) {
   const { unsigned } = baseTxLengths[type || "ethereum-legacy"];
   return transaction.length === unsigned || isSigned(type, transaction);
 }

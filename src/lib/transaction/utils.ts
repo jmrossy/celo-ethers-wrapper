@@ -1,7 +1,7 @@
 import { hexlify, BigNumberish, isBytesLike, toBeHex } from "ethers";
 import { GAS_INFLATION_FACTOR } from "../../consts";
 
-function isEmpty(value: string | BigNumberish | undefined | null) {
+export function isEmpty(value: string | BigNumberish | undefined | null) {
   if (value === undefined || value === null || value === "0" || value === 0n) {
     return true;
   }
@@ -15,32 +15,8 @@ export function isPresent(value: string | BigNumberish | undefined | null) {
   return !isEmpty(value);
 }
 
-export function isEIP1559(tx: any): boolean {
-  return isPresent(tx.maxFeePerGas) && isPresent(tx.maxPriorityFeePerGas);
-}
-
 export function isCIP64(tx: any) {
-  return (
-    isEIP1559(tx) &&
-    isPresent(tx.feeCurrency) &&
-    !isPresent(tx.gatewayFeeRecipient) &&
-    !isPresent(tx.gatewayFee)
-  );
-}
-
-/**
- * Identifies transactions that specify the `feeCurrency` field, but are not yet EIP-1559,
- * because they don't specify `maxPriorityFeePerGas`, `maxFeePerGas`, and `gasLimit`.
- * 
- * @param tx object with transaction parameters 
- * @returns true if `feeCurrency` field is specified, false otherwise.
- */
-export function isFeeCurrency(tx: any): boolean {
-  return (
-    isPresent(tx.feeCurrency) &&
-    !isPresent(tx.gatewayFeeRecipient) &&
-    !isPresent(tx.gatewayFee)
-  )
+  return isPresent(tx.feeCurrency);
 }
 
 export function concatHex(values: string[]): `0x${string}` {
