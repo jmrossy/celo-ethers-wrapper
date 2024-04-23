@@ -40,11 +40,11 @@ export default class CeloWallet extends Wallet {
       try {
         tx.gasLimit = await this.estimateGas(tx);
       } catch (error: any) {
-        // If there is a code it's an expected error
+        // If there is an error code it's an expected error
         if (forwardErrors.indexOf(error.code) >= 0) {
           throw error;
         }
-        // Else there is no code so it's an unexpected errors
+        // If there is no error code it's an unexpected error
         assertArgument(
           false,
           "cannot estimate gas; transaction may fail or may require manual gas limit",
