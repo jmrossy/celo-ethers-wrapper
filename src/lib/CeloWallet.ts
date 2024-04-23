@@ -13,14 +13,8 @@ import {
   Wordlist,
 } from "ethers";
 import CeloProvider from "./CeloProvider";
-import { adjustForGasInflation, isPresent } from "./transaction/utils";
-import {
-  CeloTransaction,
-  CeloTransactionRequest,
-  getTxType,
-  serializeCeloTransaction,
-  TxTypeToPrefix,
-} from "./transactions";
+import { adjustForGasInflation, isEmpty } from "./transaction/utils";
+import { CeloTransaction, CeloTransactionRequest, serializeCeloTransaction } from "./transactions";
 
 const forwardErrors = [
   "INSUFFICIENT_FUNDS",
@@ -33,34 +27,24 @@ export default class CeloWallet extends Wallet {
    * Override to skip checkTransaction step which rejects Celo tx properties
    * https://github.com/ethers-io/ethers.js/blob/master/packages/abstract-signer/src.ts/index.ts
    */
-  async populateTransaction(
-    transaction: CeloTransactionRequest
-  ): Promise<CeloTransaction> {
+  async populateTransaction(transaction: CeloTransactionRequest): Promise<CeloTransaction> {
     let tx: any = await resolveProperties(transaction);
-    if (tx.to != null) {
-      tx.to = Promise.resolve(tx.to);
-    }
 
-    if (tx.from == null) {
+    if (isEmpty(tx.from)) {
       tx.from = this.address;
     }
-
-    const type = getTxType(tx);
-    
-    if (!type && tx.gasPrice == null) {
-      tx.gasPrice = this.getGasPrice();
-    }
-
-    if (tx.nonce == null) {
+    if (isEmpty(tx.nonce)) {
       tx.nonce = await this.provider?.getTransactionCount(tx.from, "pending");
     }
-
-    tx = await resolveProperties(tx);
-    if (tx.gasLimit == null) {
-      tx.gasLimit = this.estimateGas(tx).catch((error) => {
+    if (isEmpty(tx.gasLimit)) {
+      try {
+        tx.gasLimit = await this.estimateGas(tx);
+      } catch (error: any) {
+        // If there is a code it's an expected error
         if (forwardErrors.indexOf(error.code) >= 0) {
           throw error;
         }
+        // Else there is no code so it's an unexpected errors
         assertArgument(
           false,
           "cannot estimate gas; transaction may fail or may require manual gas limit",
@@ -70,34 +54,28 @@ export default class CeloWallet extends Wallet {
             tx: tx,
           }
         );
-      });
+      }
     }
 
-    if (type === TxTypeToPrefix.cip64
-      && (!isPresent(tx.maxPriorityFeePerGas) || !isPresent(tx.maxFeePerGas))
-    ) {
-      const { maxFeePerGas, maxPriorityFeePerGas } = (await (this.provider as CeloProvider)?.getFeeData(tx.feeCurrency))!;
+    if (isEmpty(tx.maxPriorityFeePerGas) || isEmpty(tx.maxFeePerGas)) {
+      const { maxFeePerGas, maxPriorityFeePerGas } = (await (
+        this.provider as CeloProvider
+      )?.getFeeData(tx.feeCurrency as string | undefined))!;
       tx.maxFeePerGas = maxFeePerGas;
       tx.maxPriorityFeePerGas = maxPriorityFeePerGas;
     }
 
-    if (tx.chainId == null) {
+    if (isEmpty(tx.chainId)) {
       tx.chainId = (await this.provider!.getNetwork()).chainId;
     } else {
-      tx.chainId = Promise.all([
-        Promise.resolve(tx.chainId),
-        (await this.provider!.getNetwork()).chainId,
-      ]).then((results) => {
-        if (results[1] !== 0n && results[0] !== results[1]) {
-          assertArgument(
-            false,
-            "chainId address mismatch",
-            "transaction",
-            transaction
-          );
+      tx.chainId = Promise.all([tx.chainId, (await this.provider!.getNetwork()).chainId]).then(
+        ([txChainId, providerChainId]) => {
+          if (providerChainId !== 0n && txChainId !== providerChainId) {
+            assertArgument(false, "chainId address mismatch", "transaction", transaction);
+          }
+          return txChainId;
         }
-        return results[0];
-      });
+      );
     }
     return resolveProperties<CeloTransaction>(tx);
   }
@@ -121,9 +99,7 @@ export default class CeloWallet extends Wallet {
       delete tx.from;
     }
 
-    const signature = this.signingKey.sign(
-      keccak256(serializeCeloTransaction(tx))
-    );
+    const signature = this.signingKey.sign(keccak256(serializeCeloTransaction(tx)));
     const serialized = serializeCeloTransaction(tx, signature);
     return serialized;
   }
@@ -131,9 +107,7 @@ export default class CeloWallet extends Wallet {
   /**
    * Override to serialize transaction using custom serialize method
    */
-  async sendTransaction(
-    transaction: CeloTransactionRequest
-  ): Promise<TransactionResponse> {
+  async sendTransaction(transaction: CeloTransactionRequest): Promise<TransactionResponse> {
     const provider = this.provider!;
 
     const pop = await this.populateTransaction(transaction);
@@ -160,15 +134,8 @@ export default class CeloWallet extends Wallet {
     } as PerformActionRequest);
   }
 
-  static fromMnemonic(
-    phrase: string,
-    path?: string,
-    wordlist?: Wordlist | null
-  ) {
-    const hdWallet = HDNodeWallet.fromMnemonic(
-      Mnemonic.fromPhrase(phrase, null, wordlist),
-      path
-    );
+  static fromMnemonic(phrase: string, path?: string, wordlist?: Wordlist | null) {
+    const hdWallet = HDNodeWallet.fromMnemonic(Mnemonic.fromPhrase(phrase, null, wordlist), path);
 
     return new CeloWallet(hdWallet.privateKey, new CeloProvider());
   }
