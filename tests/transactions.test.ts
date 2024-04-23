@@ -1,5 +1,5 @@
 import { test, expect, describe } from "@jest/globals";
-import { getSigner, getTransactionByHash, MINIMAL_USDC_ABI } from "./common";
+import { getSigner, MINIMAL_USDC_ABI } from "./common";
 import { BLOCK_TIME, USDC_ADAPTER_ALFAJORES_ADDRESS, USDC_ALFAJORES_ADDRESS } from "./consts";
 import { Contract, ContractFactory } from "ethers";
 import { TxTypeToPrefix } from "../src/lib/transactions";
@@ -43,8 +43,6 @@ describe("[ethereum-compatibility] when sending a transaction with gas in CELO, 
                 maxPriorityFeePerGas: BigInt(100e9),
             });
             const txReceipt = await txResponse.wait();
-            expect(txReceipt).not.toBeNull();
-            const jsonRpcResponse = await getTransactionByHash(txReceipt!.hash);
 
             expect(txReceipt?.type).toEqual(TxTypeToPrefix.eip1559); // transaction is EIP1559
             expect(txReceipt?.hash).toMatch(/0x.{40}/); // transaction is successful
@@ -59,8 +57,6 @@ describe("[ethereum-compatibility] when sending a transaction with gas in CELO, 
                 value: BigInt(1),
             });
             const txReceipt = await txResponse.wait();
-            expect(txReceipt).not.toBeNull();
-            const jsonRpcResponse = await getTransactionByHash(txReceipt!.hash);
 
             expect(txReceipt?.type).toEqual(TxTypeToPrefix.eip1559); // transaction is EIP-1559
             expect(txReceipt?.hash).toMatch(/0x.{40}/); // transaction is successful
@@ -73,8 +69,6 @@ describe("[ethereum-compatibility] when sending a transaction with gas in CELO, 
         async () => {
             const txResponse = await usdc.transfer(signer.address, 1n);
             const txReceipt = await txResponse.wait();
-            expect(txReceipt).not.toBeNull();
-            const jsonRpcResponse = await getTransactionByHash(txReceipt!.hash);
 
             expect(txReceipt?.type).toEqual(TxTypeToPrefix.eip1559); // transaction is EIP-1559
             expect(txReceipt?.hash).toMatch(/0x.{40}/); // transaction is successful
