@@ -86,18 +86,19 @@ export default class CeloProvider extends JsonRpcProvider {
     );
   }
 
-    async getFeeData(feeCurrency?: string): Promise<FeeData> {
-        if (!feeCurrency) {
-            return super.getFeeData();
-        }
-        const maxPriorityFeePerGas = getBigInt(
-            await this.send("eth_maxPriorityFeePerGas", [feeCurrency])
-        );
-        const { baseFeePerGas } = (await this.getBlock("latest", false))!
-        const gasPrice = null;
-        const maxFeePerGas = baseFeePerGas! * 2n + maxPriorityFeePerGas;
-        return new FeeData(gasPrice, maxFeePerGas, maxPriorityFeePerGas)
+  async getFeeData(feeCurrency?: string): Promise<FeeData> {
+    if (!feeCurrency) {
+      return super.getFeeData();
     }
+    // On Celo, `eth_gasPrice` returns the base fee for the given currency multiplied 2 
+    // and doesn't include tips. Source: https://github.com/jmrossy/celo-ethers-wrapper/pull/20#discussion_r1579179736
+    const baseFeePerGasInFeeCurrency = getBigInt(await this.send("eth_gasPrice", [feeCurrency]));
+    const maxPriorityFeePerGasInFeeCurrency = getBigInt(
+      await this.send("eth_maxPriorityFeePerGas", [feeCurrency])
+    );
+    const maxFeePerGasInFeeCurrency = baseFeePerGasInFeeCurrency! + maxPriorityFeePerGasInFeeCurrency;
+    return new FeeData(null, maxFeePerGasInFeeCurrency, maxPriorityFeePerGasInFeeCurrency);
+  }
 
   async broadcastTransaction(signedTx: string): Promise<TransactionResponse> {
     const { hash } = await resolveProperties({
