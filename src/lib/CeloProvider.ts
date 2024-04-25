@@ -96,7 +96,7 @@ export default class CeloProvider extends JsonRpcProvider {
     const maxPriorityFeePerGasInFeeCurrency = getBigInt(
       await this.send("eth_maxPriorityFeePerGas", [feeCurrency])
     );
-    const maxFeePerGasInFeeCurrency = baseFeePerGasInFeeCurrency! + maxPriorityFeePerGasInFeeCurrency;
+    const maxFeePerGasInFeeCurrency = baseFeePerGasInFeeCurrency + maxPriorityFeePerGasInFeeCurrency;
     return new FeeData(null, maxFeePerGasInFeeCurrency, maxPriorityFeePerGasInFeeCurrency);
   }
 
