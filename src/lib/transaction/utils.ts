@@ -1,7 +1,7 @@
 import { hexlify, BigNumberish, isBytesLike, toBeHex } from "ethers";
 import { GAS_INFLATION_FACTOR } from "../../consts";
 
-function isEmpty(value: string | BigNumberish | undefined | null) {
+export function isEmpty(value: string | BigNumberish | undefined | null) {
   if (value === undefined || value === null || value === "0" || value === 0n) {
     return true;
   }
@@ -11,30 +11,12 @@ function isEmpty(value: string | BigNumberish | undefined | null) {
   return toBeHex(value) === "0x0";
 }
 
-function isPresent(value: string | BigNumberish | undefined | null) {
+export function isPresent(value: string | BigNumberish | undefined | null) {
   return !isEmpty(value);
 }
 
-export function isEIP1559(tx: any): boolean {
-  return isPresent(tx.maxFeePerGas) && isPresent(tx.maxPriorityFeePerGas);
-}
-
 export function isCIP64(tx: any) {
-  return (
-    isEIP1559(tx) &&
-    isPresent(tx.feeCurrency) &&
-    !isPresent(tx.gatewayFeeRecipient) &&
-    !isPresent(tx.gatewayFeeRecipient)
-  );
-}
-
-export function isCIP42(tx: any): boolean {
-  return (
-    isEIP1559(tx) &&
-    (isPresent(tx.feeCurrency) ||
-      isPresent(tx.gatewayFeeRecipient) ||
-      isPresent(tx.gatewayFee))
-  );
+  return isPresent(tx.feeCurrency);
 }
 
 export function concatHex(values: string[]): `0x${string}` {
