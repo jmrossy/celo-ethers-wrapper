@@ -23,13 +23,11 @@ import {
   TransactionRequest,
   zeroPadValue,
 } from "ethers";
-import { concatHex, isCIP64, isEIP1559 } from "./transaction/utils";
+import { concatHex, isCIP64 } from "./transaction/utils";
 import { EIGHT, EIP155_NUMBER, Y_PARITY_EIP_2098 } from "../consts";
 
 export interface CeloTransactionRequest extends TransactionRequest {
   feeCurrency?: string;
-  gatewayFeeRecipient?: string;
-  gatewayFee?: bigint;
 }
 
 export interface CeloTransactionCip64 extends TransactionLike {
@@ -40,18 +38,8 @@ export interface CeloTransactionCip64 extends TransactionLike {
 export interface CeloTransactionEip1559 extends TransactionLike {
   type: TxTypeToPrefix.eip1559;
 }
-export interface LegacyCeloTransaction extends TransactionLike {
-  type: undefined;
-  gasPrice: bigint;
-  feeCurrency: string;
-  gatewayFeeRecipient: string;
-  gatewayFee: bigint;
-}
 
-export type CeloTransaction =
-  | LegacyCeloTransaction
-  | CeloTransactionCip64
-  | CeloTransactionEip1559;
+export type CeloTransaction = CeloTransactionCip64 | CeloTransactionEip1559 | TransactionLike;
 
 export enum TxTypeToPrefix {
   cip64 = 0x7b,
@@ -63,6 +51,7 @@ interface Field {
   length?: number;
   numeric?: true;
 }
+
 export const celoAllowedTransactionKeys = {
   type: true,
   chainId: true,
@@ -73,8 +62,6 @@ export const celoAllowedTransactionKeys = {
   to: true,
   value: true,
   feeCurrency: true,
-  gatewayFeeRecipient: true,
-  gatewayFee: true,
   maxFeePerGas: true,
   maxPriorityFeePerGas: true,
   accessList: true,
@@ -96,17 +83,13 @@ type CeloFieldName =
       | "blockTag"
       | "enableCcipRead"
     >
-  | "feeCurrency"
-  | "gatewayFeeRecipient"
-  | "gatewayFee";
+  | "feeCurrency";
 
 export const celoTransactionFields: Record<CeloFieldName, Field> = {
   nonce: { maxLength: 32, numeric: true } as Field,
   gasPrice: { maxLength: 32, numeric: true } as Field,
   gasLimit: { maxLength: 32, numeric: true } as Field,
   feeCurrency: { length: 20 } as Field,
-  gatewayFeeRecipient: { length: 20 } as Field,
-  gatewayFee: { maxLength: 32, numeric: true } as Field,
   to: { length: 20 } as Field,
   value: { maxLength: 32, numeric: true } as Field,
   data: {} as Field,
@@ -130,29 +113,15 @@ function formatCeloField(name: CeloFieldName, value: any) {
   let _value = toBeArray(value);
 
   // Fixed-width field
-  if (
-    fieldInfo.length &&
-    _value.length !== fieldInfo.length &&
-    _value.length > 0
-  ) {
-    assertArgument(
-      false,
-      "invalid length for " + name,
-      "transaction:" + name,
-      _value
-    );
+  if (fieldInfo.length && _value.length !== fieldInfo.length && _value.length > 0) {
+    assertArgument(false, "invalid length for " + name, "transaction:" + name, _value);
   }
 
   // Variable-width (with a maximum)
   if (fieldInfo.maxLength) {
     _value = toBeArray(stripZerosLeft(_value));
     if (_value.length > fieldInfo.maxLength) {
-      assertArgument(
-        false,
-        "invalid length for " + name,
-        "transaction:" + name,
-        _value
-      );
+      assertArgument(false, "invalid length for " + name, "transaction:" + name, _value);
     }
   }
 
@@ -160,33 +129,16 @@ function formatCeloField(name: CeloFieldName, value: any) {
 }
 
 export function getTxType(tx: CeloTransaction) {
-  if (isCIP64(tx)) {
-    // @ts-ignore
-    delete tx.gatewayFee;
-    // @ts-ignore
-    delete tx.gatewayFeeRecipient;
-    // @ts-ignore
-    delete tx.gasPrice;
-    return TxTypeToPrefix.cip64;
-  } else if (isEIP1559(tx)) {
-    // @ts-ignore
-    delete tx.feeCurrency;
-    // @ts-ignore
-    delete tx.gatewayFee;
-    // @ts-ignore
-    delete tx.gatewayFeeRecipient;
-    // @ts-ignore
-    delete tx.gasPrice;
-    return TxTypeToPrefix.eip1559;
-  } else {
+  if (tx.gasPrice) {
     return "";
   }
+  if (isCIP64(tx)) {
+    return TxTypeToPrefix.cip64;
+  }
+  return TxTypeToPrefix.eip1559;
 }
 
-function prepareEncodeTx(
-  tx: CeloTransaction,
-  signature?: Signature
-): RlpStructuredData {
+function prepareEncodeTx(tx: CeloTransaction, signature?: Signature): RlpStructuredData {
   let raw: RlpStructuredData[] = [];
   switch (tx.type) {
     case TxTypeToPrefix.cip64:
@@ -203,7 +155,7 @@ function prepareEncodeTx(
         tx.data || "0x",
         // @ts-expect-error
         tx.accessList || [],
-        tx.feeCurrency || "0x",
+        (tx as CeloTransactionCip64).feeCurrency || "0x",
       ];
       break;
     case TxTypeToPrefix.eip1559:
@@ -223,15 +175,12 @@ function prepareEncodeTx(
       ];
       break;
     default:
-      // This order should match the order in Geth.
-      // https://github.com/celo-org/celo-blockchain/blob/027dba2e4584936cc5a8e8993e4e27d28d5247b8/core/types/transaction.go#L65
+      // Type 0 Ethereum legacy transaction:
+      // rlp([nonce, gasprice, gaslimit, recipient, amount, data, v, r, s])
       raw = [
         toBeHex(tx.nonce!),
         tx.gasPrice ? toBeHex(tx.gasPrice) : "0x",
         tx.gasLimit ? toBeHex(tx.gasLimit) : "0x",
-        tx.feeCurrency || "0x",
-        tx.gatewayFeeRecipient || "0x",
-        tx.gatewayFee ? toBeHex(tx.gatewayFee) : "0x",
         tx.to || "0x",
         tx.value ? toBeHex(tx.value) : "0x",
         tx.data || "0x",
@@ -264,25 +213,16 @@ export function serializeCeloTransaction(
 ): string {
   Object.keys(transaction).forEach((property) => {
     if (!(property in celoAllowedTransactionKeys)) {
-      assertArgument(
-        false,
-        "unknown property",
-        "serializeCeloTransaction",
-        property
-      );
+      assertArgument(false, "unknown property", "serializeCeloTransaction", property);
     }
   });
 
-  const txArgs: Partial<Record<keyof CeloTransaction, string | Uint8Array>> =
-    {};
+  const txArgs: Partial<Record<keyof CeloTransaction, string | Uint8Array>> = {};
 
   Object.entries(transaction).forEach(([fieldName, fieldValue]) => {
     if (fieldName in celoTransactionFields) {
       // @ts-expect-error
-      txArgs[fieldName as CeloFieldName] = formatCeloField(
-        fieldName as CeloFieldName,
-        fieldValue
-      );
+      txArgs[fieldName as CeloFieldName] = formatCeloField(fieldName as CeloFieldName, fieldValue);
     }
   });
 
@@ -292,19 +232,9 @@ export function serializeCeloTransaction(
     chainId = parseInt(transaction.chainId.toString(16), 16);
 
     if (typeof chainId !== "number") {
-      assertArgument(
-        false,
-        "invalid transaction.chainId",
-        "transaction",
-        transaction
-      );
+      assertArgument(false, "invalid transaction.chainId", "transaction", transaction);
     }
-  } else if (
-    signature &&
-    !isBytesLike(signature) &&
-    signature.v &&
-    getNumber(signature.v) > 28
-  ) {
+  } else if (signature && !isBytesLike(signature) && signature.v && getNumber(signature.v) > 28) {
     // No chainId provided, but the signature is signing with EIP-155; derive chainId
     chainId = Math.floor((getNumber(signature.v) - EIP155_NUMBER) / 2);
   }
@@ -343,20 +273,10 @@ export function serializeCeloTransaction(
 
       // If an EIP-155 v (directly or indirectly; maybe _vs) was provided, check it!
       if (sig.v > Y_PARITY_EIP_2098 + 1 && sig.v !== v) {
-        assertArgument(
-          false,
-          "transaction.chainId/signature.v mismatch",
-          "signature",
-          signature
-        );
+        assertArgument(false, "transaction.chainId/signature.v mismatch", "signature", signature);
       }
     } else if (sig.v !== v) {
-      assertArgument(
-        false,
-        "transaction.chainId/signature.v mismatch",
-        "signature",
-        signature
-      );
+      assertArgument(false, "transaction.chainId/signature.v mismatch", "signature", signature);
     }
   }
 
@@ -368,9 +288,7 @@ export function serializeCeloTransaction(
 
 // Based on https://github.com/ethers-io/ethers.js/blob/0234cfbbef76b7f7a53efe4c434cc6d8892bf404/packages/transactions/src.ts/index.ts#L165
 // Need to override to use the celo tx prop whitelists above
-export function parseCeloTransaction(
-  rawTransaction: BytesLike
-): CeloTransaction {
+export function parseCeloTransaction(rawTransaction: BytesLike): CeloTransaction {
   const [type, transaction] = splitTypeAndRawTx(rawTransaction);
 
   let tx: CeloTransaction;
@@ -406,18 +324,19 @@ export function parseCeloTransaction(
       } as CeloTransactionEip1559;
       break;
     default:
+      /**
+       * Type 0 Ethereum legacy transaction:
+       * RLP([nonce, gasprice, gaslimit, recipient, amount, data, chaindId, 0, 0])
+       */
       tx = {
         nonce: handleNumber(transaction[0] as string),
         gasPrice: handleBigInt(transaction[1] as string),
         gasLimit: handleBigInt(transaction[2] as string),
-        feeCurrency: handleAddress(transaction[3] as string),
-        gatewayFeeRecipient: handleAddress(transaction[4] as string),
-        gatewayFee: handleBigInt(transaction[5] as string),
-        to: handleAddress(transaction[6] as string),
-        value: handleBigInt(transaction[7] as string),
-        data: transaction[8] as string,
-        chainId: handleBigInt(transaction[9] as string),
-      } as LegacyCeloTransaction;
+        to: handleAddress(transaction[3] as string),
+        value: handleBigInt(transaction[4] as string),
+        data: transaction[5] as string,
+        chainId: handleBigInt(transaction[6] as string),
+      } as TransactionLike;
       break;
   }
 
@@ -510,7 +429,12 @@ function handleAccessList(value: string): AccessListish | "0x" {
 const baseTxLengths = {
   [TxTypeToPrefix.cip64]: { unsigned: 10, signed: 13 },
   [TxTypeToPrefix.eip1559]: { unsigned: 9, signed: 12 },
-  "celo-legacy": { unsigned: 12, signed: 12 },
+  /**
+   * Unsigned: RLP([nonce, gasprice, gaslimit, recipient, amount, data, chaindId, 0, 0])
+   * Signed: RLP([nonce, gasprice, gaslimit, recipient, amount, data, v, r, s])
+   * Source: https://github.com/celo-org/txtypes?tab=readme-ov-file#legacy-transactions
+   */
+  "ethereum-legacy": { unsigned: 9, signed: 9 },
 } as const;
 
 function isSigned(type: TxTypeToPrefix, transaction: RlpStructuredData[]) {
@@ -524,11 +448,8 @@ function isSigned(type: TxTypeToPrefix, transaction: RlpStructuredData[]) {
   return r !== "0x" && s !== "0x";
 }
 
-function isCorrectLength(
-  type: TxTypeToPrefix,
-  transaction: RlpStructuredData[]
-) {
-  const { unsigned } = baseTxLengths[type || "celo-legacy"];
+function isCorrectLength(type: TxTypeToPrefix, transaction: RlpStructuredData[]) {
+  const { unsigned } = baseTxLengths[type || "ethereum-legacy"];
   return transaction.length === unsigned || isSigned(type, transaction);
 }
 

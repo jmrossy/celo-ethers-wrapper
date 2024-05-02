@@ -1,11 +1,11 @@
 import {
+  FeeData,
   JsonRpcProvider,
   PerformActionRequest,
   TransactionResponse,
   TransactionResponseParams,
   getBigInt,
   resolveProperties,
-  toBeHex,
 } from "ethers";
 import { CeloTransactionRequest, parseCeloTransaction } from "./transactions";
 
@@ -19,10 +19,7 @@ export default class CeloProvider extends JsonRpcProvider {
         // If there are no EIP-1559 properties, it might be non-EIP-1559
         if (tx.maxFeePerGas == null && tx.maxPriorityFeePerGas == null) {
           const feeData = await this.getFeeData();
-          if (
-            feeData.maxFeePerGas == null &&
-            feeData.maxPriorityFeePerGas == null
-          ) {
+          if (feeData.maxFeePerGas == null && feeData.maxPriorityFeePerGas == null) {
             // Network doesn't know about EIP-1559 (and hence type)
             req = Object.assign({}, req, {
               transaction: Object.assign({}, tx, { type: undefined }),
@@ -45,9 +42,7 @@ export default class CeloProvider extends JsonRpcProvider {
    * Override to handle alternative gas currencies
    * prepareRequest in https://github.com/ethers-io/ethers.js/blob/master/packages/providers/src.ts/json-rpc-provider.ts
    */
-  getRpcRequest(
-    req: PerformActionRequest
-  ): null | { method: string; args: Array<any> } {
+  getRpcRequest(req: PerformActionRequest): null | { method: string; args: Array<any> } {
     if (req.method === "getGasPrice") {
       // @ts-expect-error
       const param = req.feeCurrencyAddress
@@ -61,8 +56,6 @@ export default class CeloProvider extends JsonRpcProvider {
       const extraneous_keys = [
         ["from", (x: string) => x],
         ["feeCurrency", (x: string) => x],
-        ["gatewayFeeRecipient", (x: string) => x],
-        ["gatewayFee", toBeHex],
       ] as const;
 
       const tx = {
@@ -91,6 +84,20 @@ export default class CeloProvider extends JsonRpcProvider {
       }),
       "%response"
     );
+  }
+
+  async getFeeData(feeCurrency?: string): Promise<FeeData> {
+    if (!feeCurrency) {
+      return super.getFeeData();
+    }
+    // On Celo, `eth_gasPrice` returns the base fee for the given currency multiplied 2 
+    // and doesn't include tips. Source: https://github.com/jmrossy/celo-ethers-wrapper/pull/20#discussion_r1579179736
+    const baseFeePerGasInFeeCurrency = getBigInt(await this.send("eth_gasPrice", [feeCurrency]));
+    const maxPriorityFeePerGasInFeeCurrency = getBigInt(
+      await this.send("eth_maxPriorityFeePerGas", [feeCurrency])
+    );
+    const maxFeePerGasInFeeCurrency = baseFeePerGasInFeeCurrency + maxPriorityFeePerGasInFeeCurrency;
+    return new FeeData(null, maxFeePerGasInFeeCurrency, maxPriorityFeePerGasInFeeCurrency);
   }
 
   async broadcastTransaction(signedTx: string): Promise<TransactionResponse> {

@@ -17,7 +17,7 @@ export class CeloscanProvider extends EtherscanProvider {
       case "celo":
         return "https://api.celoscan.io";
       case "alfajores":
-        return "https://alfajores.celoscan.io";
+        return "https://api-alfajores.celoscan.io";
       case "baklava":
         // baklava is currently not supported by celoscan.io, so we use Blockscout
         return "https://explorer.celo.org/baklava";
