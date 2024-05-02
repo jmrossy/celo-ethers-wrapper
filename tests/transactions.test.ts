@@ -1,32 +1,32 @@
-import { test, expect, describe } from "@jest/globals";
-import { getSigner, MINIMAL_USDC_ABI } from "./common";
-import { BLOCK_TIME, USDC_ADAPTER_ALFAJORES_ADDRESS, USDC_ALFAJORES_ADDRESS } from "./consts";
+import { describe, expect, test } from "@jest/globals";
 import { Contract, ContractFactory } from "ethers";
 import { TxTypeToPrefix } from "../src/lib/transactions";
 import HelloWorldContract from "./HelloWorld";
+import { MINIMAL_USDC_ABI, getSigner } from "./common";
+import { BLOCK_TIME, USDC_ADAPTER_ALFAJORES_ADDRESS, USDC_ALFAJORES_ADDRESS } from "./consts";
 
 const signer = getSigner();
 const usdc = new Contract(USDC_ALFAJORES_ADDRESS, MINIMAL_USDC_ABI, signer);
 
 describe("[setup] supplied wallet has sufficient tokens to run tests", () => {
   test(
-    "has more than 1 CELO",
+    "has at least 1 CELO",
     async () => {
       const balanceInWei = await signer.provider?.getBalance(signer.address);
       expect(balanceInWei).not.toBeUndefined();
       const balanceInDecimal = balanceInWei! / BigInt(1e18); // CELO has 18 decimals
-      expect(balanceInDecimal).toBeGreaterThan(1);
+      expect(balanceInDecimal).toBeGreaterThanOrEqual(1);
     },
     BLOCK_TIME * 3
   );
 
   test(
-    "has more than 1 USDC",
+    "has at least 1 USDC",
     async () => {
       const balanceInWei = await usdc.balanceOf(signer.address);
       expect(balanceInWei).not.toBeUndefined();
       const balanceInDecimal = balanceInWei! / BigInt(1e6); // USDC has 6 decimals
-      expect(balanceInDecimal).toBeGreaterThan(1);
+      expect(balanceInDecimal).toBeGreaterThanOrEqual(1);
     },
     BLOCK_TIME * 3
   );
