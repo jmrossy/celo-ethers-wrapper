@@ -1,5 +1,6 @@
 import { hexlify, BigNumberish, isBytesLike, toBeHex } from "ethers";
 import { GAS_INFLATION_FACTOR } from "../../consts";
+import { CeloTransaction, CeloTransactionCip64, CeloTransactionCip66 } from "../transactions";
 
 export function isEmpty(value: string | BigNumberish | undefined | null) {
   if (value === undefined || value === null || value === "0" || value === 0n) {
@@ -15,8 +16,13 @@ export function isPresent(value: string | BigNumberish | undefined | null) {
   return !isEmpty(value);
 }
 
-export function isCIP64(tx: any) {
-  return isPresent(tx.feeCurrency);
+export function isCIP64(tx: CeloTransaction) {
+  return isPresent((tx as CeloTransactionCip64).feeCurrency);
+}
+
+export function isCIP66(tx: CeloTransaction) {
+  return isPresent((tx as CeloTransactionCip66).feeCurrency)
+    && isPresent((tx as CeloTransactionCip66).maxFeeInFeeCurrency);
 }
 
 export function concatHex(values: string[]): `0x${string}` {
