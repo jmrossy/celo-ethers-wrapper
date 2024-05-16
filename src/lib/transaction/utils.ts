@@ -16,11 +16,12 @@ export function isPresent(value: string | BigNumberish | undefined | null) {
   return !isEmpty(value);
 }
 
-export function isCIP64(tx: CeloTransaction) {
-  return isPresent((tx as CeloTransactionCip64).feeCurrency);
+export function isCIP64(tx: CeloTransaction): tx is CeloTransactionCip64 {
+  return isPresent((tx as CeloTransactionCip64).feeCurrency) &&
+  isEmpty((tx as CeloTransactionCip66).maxFeeInFeeCurrency);
 }
 
-export function isCIP66(tx: CeloTransaction) {
+export function isCIP66(tx: CeloTransaction): tx is CeloTransactionCip66  {
   return isPresent((tx as CeloTransactionCip66).feeCurrency)
     && isPresent((tx as CeloTransactionCip66).maxFeeInFeeCurrency);
 }
