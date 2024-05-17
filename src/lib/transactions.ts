@@ -12,7 +12,6 @@ import {
   hexlify,
   isBytesLike,
   keccak256,
-  Numeric,
   recoverAddress,
   RlpStructuredData,
   Signature,
@@ -29,6 +28,7 @@ import { EIGHT, EIP155_NUMBER, Y_PARITY_EIP_2098 } from "../consts";
 
 export interface CeloTransactionRequest extends TransactionRequest {
   feeCurrency?: string;
+  maxFeeInFeeCurrency?: bigint
 }
 
 export interface CeloTransactionCip64 extends TransactionLike {
@@ -39,7 +39,7 @@ export interface CeloTransactionCip64 extends TransactionLike {
 export interface CeloTransactionCip66 extends TransactionLike {
   type: TxTypeToPrefix.cip66;
   feeCurrency: string;
-  maxFeeInFeeCurrency: Numeric;
+  maxFeeInFeeCurrency: bigint;
 }
 
 export interface CeloTransactionEip1559 extends TransactionLike {
