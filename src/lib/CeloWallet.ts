@@ -168,7 +168,6 @@ export default class CeloWallet extends Wallet {
 
     const maxGasFeesInCELO = gasLimit * maxFeePerGas
     const [numerator, denominator] = await getConversionRateFromCeloToToken(feeCurrency, {wallet: this})
-    // TODO is the medianRate given by SortedOracles actually the rate to convert from CELO to the token or from the token to CELO?
     const feeDenominatedInToken = (maxGasFeesInCELO * numerator) / denominator
     return feeDenominatedInToken
   }

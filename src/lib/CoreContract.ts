@@ -64,5 +64,9 @@ const MINIMAL_REGISTRY_ABI =  [{
     const oracle = new Contract(oracleAddress, MINIMAL_ORACLE_INTERFACE, wallet)
 
     const [numerator, denominator]: bigint[] = await oracle.medianRate(tokenAddress)
+     // The function docs for the Contract are confusing but  in ContractKit the Sorted orcles wrapper 
+    // defines numerator as the amount of the token and denominiator as equvalent value in CELO 
+    // https://github.com/celo-org/developer-tooling/blob/master/packages/sdk/contractkit/src/wrappers/SortedOracles.ts#L80
+    // https://github.com/celo-org/celo-monorepo/blob/master/packages/protocol/contracts/stability/SortedOracles.sol
     return [numerator, denominator]
   }
