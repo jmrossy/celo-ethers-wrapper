@@ -105,7 +105,8 @@ export default class CeloWallet extends Wallet {
 
       if (useCIP66ForEasyFeeTransactions && isEmpty(tx.maxFeeInFeeCurrency)) {
         const gasLimit = BigInt(tx.gasLimit!) 
-        tx.maxFeeInFeeCurrency = await this.estimateMaxFeeInFeeToken({feeCurrency: tx.feeCurrency!, gasLimit, maxFeePerGas: maxFeePerGas!})
+        const maxFeeInFeeCurrency = await this.estimateMaxFeeInFeeToken({feeCurrency: tx.feeCurrency!, gasLimit, maxFeePerGas: maxFeePerGas!})
+        tx.maxFeeInFeeCurrency = maxFeeInFeeCurrency
       }
     }
 
@@ -158,20 +159,23 @@ export default class CeloWallet extends Wallet {
   /**
    * For cip 66 transactions (the prefered way to pay for gas with fee tokens on Cel2) it is nessessary
    * to provide the absolute limit one is willing to pay denominated in the token. 
-   * In contrast with earlier tx types for fee currencies (celo legacy, cip42, cip 64)
-   * Estimation requires the gas, maxfeePerGas and the conversion rate from CELO to feeToken
+   * In contrast with earlier tx types for fee currencies (celo legacy, cip42, cip 64).
+   * 
+   * Calulating Estimation requires the gas, maxfeePerGas and the conversion rate from CELO to feeToken
    * https://github.com/celo-org/celo-proposals/blob/master/CIPs/cip-0066.md
    */
   async estimateMaxFeeInFeeToken({gasLimit, maxFeePerGas, feeCurrency}: {gasLimit: bigint, maxFeePerGas: bigint, feeCurrency: string}) {
 
     const maxGasFeesInCELO = gasLimit * maxFeePerGas
     const [numerator, denominator] = await getConversionRateFromCeloToToken(feeCurrency, {wallet: this})
+    // TODO is the medianRate given by SortedOracles actually the rate to convert from CELO to the token or from the token to CELO?
     const feeDenominatedInToken = (maxGasFeesInCELO * numerator) / denominator
     return feeDenominatedInToken
   }
 
   /**
-   * Override to support alternative gas currencies
+   * Override to support alternative gas currencies 
+   * @dev (for cip66 txn you want gasPrice in CELO so dont pass in the feeToken)
    * https://github.com/celo-tools/ethers.js/blob/master/packages/abstract-signer/src.ts/index.ts
    */
   async getGasPrice(feeCurrencyAddress?: string): Promise<bigint> {

@@ -5,7 +5,7 @@ import { CeloTransactionRequest } from "../src/lib/transactions";
 import { USDC_ADAPTER_ALFAJORES_ADDRESS } from "./consts";
 
 
-describe.only('CeloWallet', () => {
+describe('CeloWallet', () => {
     describe('populateFees', () => {
         describe('when no feeCurrency', () => {
             test('populates only maxFeePerGas and maxPriorityFeePerGas', async () => {

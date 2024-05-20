@@ -64,7 +64,5 @@ const MINIMAL_REGISTRY_ABI =  [{
     const oracle = new Contract(oracleAddress, MINIMAL_ORACLE_INTERFACE, wallet)
 
     const [numerator, denominator]: bigint[] = await oracle.medianRate(tokenAddress)
-    // TODO see what result actually is. it might be an object or tuple. 
-    // and rate might need to be transformed into a decimal
     return [numerator, denominator]
   }
