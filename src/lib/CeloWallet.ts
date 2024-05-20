@@ -16,6 +16,7 @@ import CeloProvider from "./CeloProvider";
 import { adjustForGasInflation, isEmpty } from "./transaction/utils";
 import { CeloTransaction, CeloTransactionRequest, serializeCeloTransaction } from "./transactions";
 import { L2_PROXY_ADMIN_ADDRESS } from "../consts";
+import { getConversionRateFromCeloToToken } from "./CoreContract";
 
 const forwardErrors = [
   "INSUFFICIENT_FUNDS",
@@ -104,7 +105,7 @@ export default class CeloWallet extends Wallet {
 
       if (useCIP66ForEasyFeeTransactions && isEmpty(tx.maxFeeInFeeCurrency)) {
         const gasLimit = BigInt(tx.gasLimit!) 
-        tx.maxFeeInFeeCurrency = await this.estimateMaxFeeInFeeToken({gasLimit, maxFeePerGas: maxFeePerGas!})
+        tx.maxFeeInFeeCurrency = await this.estimateMaxFeeInFeeToken({feeCurrency: tx.feeCurrency!, gasLimit, maxFeePerGas: maxFeePerGas!})
       }
     }
 
@@ -161,11 +162,12 @@ export default class CeloWallet extends Wallet {
    * Estimation requires the gas, maxfeePerGas and the conversion rate from CELO to feeToken
    * https://github.com/celo-org/celo-proposals/blob/master/CIPs/cip-0066.md
    */
-  async estimateMaxFeeInFeeToken({gasLimit, maxFeePerGas}: {gasLimit: bigint, maxFeePerGas: bigint}) {
+  async estimateMaxFeeInFeeToken({gasLimit, maxFeePerGas, feeCurrency}: {gasLimit: bigint, maxFeePerGas: bigint, feeCurrency: string}) {
+
     const maxGasFeesInCELO = gasLimit * maxFeePerGas
-    const conversionRate = 1n 
-    // TODO get conversion rate from blockchain
-    return maxGasFeesInCELO * conversionRate
+    const [numerator, denominator] = await getConversionRateFromCeloToToken(feeCurrency, {wallet: this})
+    const feeDenominatedInToken = (maxGasFeesInCELO * numerator) / denominator
+    return feeDenominatedInToken
   }
 
   /**
