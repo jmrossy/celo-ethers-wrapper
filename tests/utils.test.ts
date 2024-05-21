@@ -1,16 +1,13 @@
-
-
 import { describe, it, expect } from "@jest/globals";
 import { convertFromCeloToToken } from "../src/lib/transaction/utils";
-
 
 describe("convertFromCeloToToken", () => {
     describe('when given an amount in CELO', () => {
         it('gives an the equivelent amount when token is more valued than celo', () => {
             const converted = convertFromCeloToToken({
                 amountInCelo: 1000n, 
-                equivalentCELO: 10n, 
-                equivalentTOKEN: 5n
+                ratioCELO: 10n, 
+                ratioTOKEN: 5n
             })
             expect(converted.toString()).toEqual(2000n.toString())
         })
@@ -22,8 +19,8 @@ describe("convertFromCeloToToken", () => {
             
             const converted = convertFromCeloToToken({
                 amountInCelo: 1000n, 
-                equivalentCELO: trueDenominator, 
-                equivalentTOKEN: trueNumerator
+                ratioCELO: trueDenominator, 
+                ratioTOKEN: trueNumerator
             })
             expect(converted.toString()).toEqual(1100n.toString())
         })

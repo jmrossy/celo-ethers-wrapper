@@ -169,8 +169,8 @@ export default class CeloWallet extends Wallet {
     const [numerator, denominator] = await getConversionRateFromCeloToToken(feeCurrency, {wallet: this})
     const feeDenominatedInToken = convertFromCeloToToken({
       amountInCelo: maxGasFeesInCELO, 
-      equivalentTOKEN: numerator, 
-      equivalentCELO: denominator
+      ratioTOKEN: numerator, 
+      ratioCELO: denominator
     })
 
     return feeDenominatedInToken

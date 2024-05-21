@@ -51,18 +51,18 @@ export function adjustForGasInflation(gas: bigint): bigint {
 
 interface ConversionParams {
   amountInCelo: bigint, 
-  equivalentCELO: bigint, 
-  equivalentTOKEN: bigint
+  ratioCELO: bigint, 
+  ratioTOKEN: bigint
 }
 /**
  * 
  * @param param0 @ConversionParams
- *  equivalentTOKEN will come from the first position (or numerator) of tuple returned from SortedOracles.medianRate 
- *  equivalentCELO will come from the second position (or denominator) of tuple returned from SortedOracles.medianRate 
+ *  ratioTOKEN will come from the first position (or numerator) of tuple returned from SortedOracles.medianRate 
+ *  ratioCELO will come from the second position (or denominator) of tuple returned from SortedOracles.medianRate 
  
  * @returns amount in token equal in value to the amountInCelo given. 
  */
-export function convertFromCeloToToken({amountInCelo, equivalentCELO, equivalentTOKEN  }: ConversionParams) {
-  return amountInCelo * equivalentCELO / equivalentTOKEN
+export function convertFromCeloToToken({amountInCelo, ratioCELO, ratioTOKEN  }: ConversionParams) {
+  return amountInCelo * ratioCELO / ratioTOKEN
 }
 
