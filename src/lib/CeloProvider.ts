@@ -85,7 +85,7 @@ export default class CeloProvider extends JsonRpcProvider {
       "%response"
     );
   }
-  // for eip1559 and cip66 transactions are denomated in CELO, cip64 fees must be looked up in the fee token
+  // for eip1559 and cip66 transactions are denominated in CELO, cip64 fees must be looked up in the fee token
   async getFeeData(feeCurrency?: string, denominateInCelo?: boolean): Promise<FeeData> {
     if (!feeCurrency || denominateInCelo) {
       return super.getFeeData();

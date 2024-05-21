@@ -92,7 +92,7 @@ export default class CeloWallet extends Wallet {
     const isCel2 = await this.isCel2()
     const noFeeCurrency = !tx.feeCurrency
     const useCIP66ForEasyFeeTransactions = isCel2 && !noFeeCurrency
-    // CIP 66 transactions are denomiated in CELO not the fee token
+    // CIP 66 transactions are denominated in CELO not the fee token
     const feesAreInCELO = noFeeCurrency || useCIP66ForEasyFeeTransactions
 
     if (isEmpty(tx.maxPriorityFeePerGas) || isEmpty(tx.maxFeePerGas)) {
@@ -157,7 +157,7 @@ export default class CeloWallet extends Wallet {
   }
 
   /**
-   * For cip 66 transactions (the prefered way to pay for gas with fee tokens on Cel2) it is nessessary
+   * For cip 66 transactions (the prefered way to pay for gas with fee tokens on Cel2) it is necessary
    * to provide the absolute limit one is willing to pay denominated in the token. 
    * In contrast with earlier tx types for fee currencies (celo legacy, cip42, cip 64).
    * 
