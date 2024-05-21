@@ -48,3 +48,21 @@ export function adjustForGasInflation(gas: bigint): bigint {
   // NOTE: prevent floating point math
   return (gas * GAS_INFLATION_FACTOR) / 100n;
 }
+
+interface ConversionParams {
+  amountInCelo: bigint, 
+  equivalentCELO: bigint, 
+  equivalentTOKEN: bigint
+}
+/**
+ * 
+ * @param param0 @ConversionParams
+ *  equivalentTOKEN will come from the first position (or numerator) of tuple returned from SortedOracles.medianRate 
+ *  equivalentCELO will come from the second position (or denominator) of tuple returned from SortedOracles.medianRate 
+ 
+ * @returns amount in token equal in value to the amountInCelo given. 
+ */
+export function convertFromCeloToToken({amountInCelo, equivalentCELO, equivalentTOKEN  }: ConversionParams) {
+  return amountInCelo * equivalentCELO / equivalentTOKEN
+}
+

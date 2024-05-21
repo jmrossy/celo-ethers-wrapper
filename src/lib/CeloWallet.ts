@@ -13,7 +13,7 @@ import {
   Wordlist,
 } from "ethers";
 import CeloProvider from "./CeloProvider";
-import { adjustForGasInflation, isEmpty } from "./transaction/utils";
+import { adjustForGasInflation, convertFromCeloToToken, isEmpty } from "./transaction/utils";
 import { CeloTransaction, CeloTransactionRequest, serializeCeloTransaction } from "./transactions";
 import { L2_PROXY_ADMIN_ADDRESS } from "../consts";
 import { getConversionRateFromCeloToToken } from "./CoreContract";
@@ -165,10 +165,14 @@ export default class CeloWallet extends Wallet {
    * https://github.com/celo-org/celo-proposals/blob/master/CIPs/cip-0066.md
    */
   async estimateMaxFeeInFeeToken({gasLimit, maxFeePerGas, feeCurrency}: {gasLimit: bigint, maxFeePerGas: bigint, feeCurrency: string}) {
-
     const maxGasFeesInCELO = gasLimit * maxFeePerGas
     const [numerator, denominator] = await getConversionRateFromCeloToToken(feeCurrency, {wallet: this})
-    const feeDenominatedInToken = (maxGasFeesInCELO * numerator) / denominator
+    const feeDenominatedInToken = convertFromCeloToToken({
+      amountInCelo: maxGasFeesInCELO, 
+      equivalentTOKEN: numerator, 
+      equivalentCELO: denominator
+    })
+
     return feeDenominatedInToken
   }
 
