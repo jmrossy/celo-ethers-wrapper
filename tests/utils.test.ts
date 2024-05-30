@@ -25,4 +25,4 @@ describe("convertFromCeloToToken", () => {
             expect(converted.toString()).toEqual(1100n.toString())
         })
     })
-})
+})  
