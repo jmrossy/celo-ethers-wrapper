@@ -55,10 +55,6 @@ export enum TxTypeToPrefix {
   eip1559 = 0x02,
 }
 
-function formatAccessList(value: AccessListish): Array<[ string, Array<string> ]> {
-  return accessListify(value).map((set) => [ set.address, set.storageKeys ]);
-}
-
 interface Field {
   maxLength?: number;
   length?: number;
@@ -344,7 +340,7 @@ export function parseCeloTransaction(rawTransaction: BytesLike): CeloTransaction
         to: handleAddress(transaction[5] as string),
         value: handleBigInt(transaction[6] as string),
         data: transaction[7] as string,
-        accessList: handleAccessList(transaction[8]),
+        accessList: handleAccessList(transaction[8] as Array<[ string, Array<string> ]>),
         feeCurrency: handleAddress(transaction[9] as string),
         maxFeeInFeeCurrency: handleBigInt(transaction[10] as string),
       } as CeloTransactionCip66;
@@ -360,7 +356,7 @@ export function parseCeloTransaction(rawTransaction: BytesLike): CeloTransaction
         to: handleAddress(transaction[5] as string),
         value: handleBigInt(transaction[6] as string),
         data: transaction[7],
-        accessList: handleAccessList(transaction[8] as string),
+        accessList: handleAccessList(transaction[8] as Array<[ string, Array<string> ]>),
         feeCurrency: handleAddress(transaction[9] as string),
       } as CeloTransactionCip64;
       break;
@@ -376,7 +372,7 @@ export function parseCeloTransaction(rawTransaction: BytesLike): CeloTransaction
         to: handleAddress(transaction[5] as string),
         value: handleBigInt(transaction[6] as string),
         data: transaction[7] as string,
-        accessList: handleAccessList(transaction[8] as string),
+        accessList: handleAccessList(transaction[8] as Array<[ string, Array<string> ]>),
       } as CeloTransactionEip1559;
       break;
     default:
@@ -474,11 +470,25 @@ function handleBigInt(value: string): bigint {
   return getBigInt(value);
 }
 
-function handleAccessList(value: any): AccessList {
+function formatAccessList(value: AccessListish): Array<[ string, Array<string> ]> {
+  return accessListify(value).map((set) => [ set.address, set.storageKeys ]);
+}
+
+/*
+@param value [
+      [
+        '0x0000000000000000000000000000000000000000',
+        [
+          '0x0000000000000000000000000000000000000000000000000000000000000001',
+          '0x60fdd29ff912ce880cd3edaf9f932dc61d3dae823ea77e0323f94adb9f6a72fe'
+        ]
+      ]
+    ]
+*/
+function handleAccessList(value: Array<[ string, Array<string> ]> | '0x'): AccessList {
   if (value === "0x") {
     return accessListify([]);
   }
-  // TODO: use value
   return accessListify(value);
 }
 
