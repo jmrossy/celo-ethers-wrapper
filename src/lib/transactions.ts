@@ -1,4 +1,5 @@
 import {
+  AccessList,
   accessListify,
   AccessListish,
   assertArgument,
@@ -54,6 +55,10 @@ export enum TxTypeToPrefix {
   eip1559 = 0x02,
 }
 
+function formatAccessList(value: AccessListish): Array<[ string, Array<string> ]> {
+  return accessListify(value).map((set) => [ set.address, set.storageKeys ]);
+}
+
 interface Field {
   maxLength?: number;
   length?: number;
@@ -106,6 +111,7 @@ export const celoTransactionFields: Record<CeloFieldName, Field> = {
   maxFeePerGas: { maxLength: 32, numeric: true } as Field,
   maxPriorityFeePerGas: { maxLength: 32, numeric: true } as Field,
   maxFeeInFeeCurrency: { maxLength: 32, numeric: true } as Field, 
+
 } as const;
 
 function formatCeloField(name: CeloFieldName, value: any) {
@@ -170,8 +176,7 @@ function prepareEncodeTx(tx: CeloTransaction, signature?: Signature): RlpStructu
         tx.to || "0x",
         tx.value ? toBeHex(tx.value) : "0x",
         tx.data || "0x",
-        // @ts-expect-error
-        tx.accessList || [],
+        formatAccessList(tx.accessList || []),
         (tx as CeloTransactionCip66).feeCurrency || "0x",
         (tx as CeloTransactionCip66).maxFeeInFeeCurrency ? toBeHex((tx as CeloTransactionCip66).maxFeeInFeeCurrency) : "0x",
       ];
@@ -188,8 +193,7 @@ function prepareEncodeTx(tx: CeloTransaction, signature?: Signature): RlpStructu
         tx.to || "0x",
         tx.value ? toBeHex(tx.value) : "0x",
         tx.data || "0x",
-        // @ts-expect-error
-        tx.accessList || [],
+        formatAccessList(tx.accessList || []),
         (tx as CeloTransactionCip64).feeCurrency || "0x",
       ];
       break;
@@ -205,8 +209,7 @@ function prepareEncodeTx(tx: CeloTransaction, signature?: Signature): RlpStructu
         tx.to || "0x",
         tx.value ? toBeHex(tx.value) : "0x",
         tx.data || "0x",
-        // @ts-expect-error
-        tx.accessList || [],
+        formatAccessList(tx.accessList || []),
       ];
       break;
     default:
@@ -258,6 +261,8 @@ export function serializeCeloTransaction(
     if (fieldName in celoTransactionFields) {
       // @ts-expect-error
       txArgs[fieldName as CeloFieldName] = formatCeloField(fieldName as CeloFieldName, fieldValue);
+    } else if (fieldName === 'accessList') {
+      txArgs[fieldName] = fieldValue
     }
   });
 
@@ -339,7 +344,7 @@ export function parseCeloTransaction(rawTransaction: BytesLike): CeloTransaction
         to: handleAddress(transaction[5] as string),
         value: handleBigInt(transaction[6] as string),
         data: transaction[7] as string,
-        accessList: handleAccessList(transaction[8] as string),
+        accessList: handleAccessList(transaction[8]),
         feeCurrency: handleAddress(transaction[9] as string),
         maxFeeInFeeCurrency: handleBigInt(transaction[10] as string),
       } as CeloTransactionCip66;
@@ -469,12 +474,12 @@ function handleBigInt(value: string): bigint {
   return getBigInt(value);
 }
 
-function handleAccessList(value: string): AccessListish | "0x" {
+function handleAccessList(value: any): AccessList {
   if (value === "0x") {
     return accessListify([]);
   }
   // TODO: use value
-  return accessListify([]);
+  return accessListify(value);
 }
 
 const baseTxLengths = {
