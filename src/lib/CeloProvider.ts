@@ -19,7 +19,10 @@ export default class CeloProvider extends JsonRpcProvider {
         // If there are no EIP-1559 properties, it might be non-EIP-1559
         if (tx.maxFeePerGas == null && tx.maxPriorityFeePerGas == null) {
           const feeData = await this.getFeeData();
-          if (feeData.maxFeePerGas == null && feeData.maxPriorityFeePerGas == null) {
+          if (
+            feeData.maxFeePerGas == null &&
+            feeData.maxPriorityFeePerGas == null
+          ) {
             // Network doesn't know about EIP-1559 (and hence type)
             req = Object.assign({}, req, {
               transaction: Object.assign({}, tx, { type: undefined }),
@@ -82,22 +85,32 @@ export default class CeloProvider extends JsonRpcProvider {
         // @ts-ignore
         transaction: _tx,
       }),
-      "%response"
+      "%response",
     );
   }
   // for eip1559 and cip66 transactions are denominated in CELO, cip64 fees must be looked up in the fee token
-  async getFeeData(feeCurrency?: string, denominateInCelo?: boolean): Promise<FeeData> {
+  async getFeeData(
+    feeCurrency?: string,
+    denominateInCelo?: boolean,
+  ): Promise<FeeData> {
     if (!feeCurrency || denominateInCelo) {
       return super.getFeeData();
     }
-    // On Celo, `eth_gasPrice` returns the base fee for the given currency multiplied 2 
+    // On Celo, `eth_gasPrice` returns the base fee for the given currency multiplied 2
     // and doesn't include tips. Source: https://github.com/jmrossy/celo-ethers-wrapper/pull/20#discussion_r1579179736
-    const baseFeePerGasInFeeCurrency = getBigInt(await this.send("eth_gasPrice", [feeCurrency]));
-    const maxPriorityFeePerGasInFeeCurrency = getBigInt(
-      await this.send("eth_maxPriorityFeePerGas", [feeCurrency])
+    const baseFeePerGasInFeeCurrency = getBigInt(
+      await this.send("eth_gasPrice", [feeCurrency]),
     );
-    const maxFeePerGasInFeeCurrency = baseFeePerGasInFeeCurrency + maxPriorityFeePerGasInFeeCurrency;
-    return new FeeData(null, maxFeePerGasInFeeCurrency, maxPriorityFeePerGasInFeeCurrency);
+    const maxPriorityFeePerGasInFeeCurrency = getBigInt(
+      await this.send("eth_maxPriorityFeePerGas", [feeCurrency]),
+    );
+    const maxFeePerGasInFeeCurrency =
+      baseFeePerGasInFeeCurrency + maxPriorityFeePerGasInFeeCurrency;
+    return new FeeData(
+      null,
+      maxFeePerGasInFeeCurrency,
+      maxPriorityFeePerGasInFeeCurrency,
+    );
   }
 
   async broadcastTransaction(signedTx: string): Promise<TransactionResponse> {

@@ -29,7 +29,7 @@ import { EIGHT, EIP155_NUMBER, Y_PARITY_EIP_2098 } from "../consts";
 
 export interface CeloTransactionRequest extends TransactionRequest {
   feeCurrency?: string;
-  maxFeeInFeeCurrency?: bigint
+  maxFeeInFeeCurrency?: bigint;
 }
 
 export interface CeloTransactionCip64 extends TransactionLike {
@@ -47,7 +47,11 @@ export interface CeloTransactionEip1559 extends TransactionLike {
   type: TxTypeToPrefix.eip1559;
 }
 
-export type CeloTransaction = CeloTransactionCip64 | CeloTransactionEip1559 | TransactionLike;
+export type CeloTransaction =
+  | CeloTransactionCip64
+  | CeloTransactionCip66
+  | CeloTransactionEip1559
+  | TransactionLike;
 
 export enum TxTypeToPrefix {
   cip64 = 0x7b,
@@ -106,8 +110,7 @@ export const celoTransactionFields: Record<CeloFieldName, Field> = {
   data: {} as Field,
   maxFeePerGas: { maxLength: 32, numeric: true } as Field,
   maxPriorityFeePerGas: { maxLength: 32, numeric: true } as Field,
-  maxFeeInFeeCurrency: { maxLength: 32, numeric: true } as Field, 
-
+  maxFeeInFeeCurrency: { maxLength: 32, numeric: true } as Field,
 } as const;
 
 function formatCeloField(name: CeloFieldName, value: any) {
@@ -174,7 +177,9 @@ function prepareEncodeTx(tx: CeloTransaction, signature?: Signature): RlpStructu
         tx.data || "0x",
         formatAccessList(tx.accessList || []),
         (tx as CeloTransactionCip66).feeCurrency || "0x",
-        (tx as CeloTransactionCip66).maxFeeInFeeCurrency ? toBeHex((tx as CeloTransactionCip66).maxFeeInFeeCurrency) : "0x",
+        (tx as CeloTransactionCip66).maxFeeInFeeCurrency
+          ? toBeHex((tx as CeloTransactionCip66).maxFeeInFeeCurrency)
+          : "0x",
       ];
       break;
     case TxTypeToPrefix.cip64:
@@ -340,7 +345,9 @@ export function parseCeloTransaction(rawTransaction: BytesLike): CeloTransaction
         to: handleAddress(transaction[5] as string),
         value: handleBigInt(transaction[6] as string),
         data: transaction[7] as string,
-        accessList: handleAccessList(transaction[8] as Array<[ string, Array<string> ]>),
+        accessList: handleAccessList(
+          transaction[8] as Array<[string, Array<string>]>,
+        ),
         feeCurrency: handleAddress(transaction[9] as string),
         maxFeeInFeeCurrency: handleBigInt(transaction[10] as string),
       } as CeloTransactionCip66;
@@ -356,7 +363,9 @@ export function parseCeloTransaction(rawTransaction: BytesLike): CeloTransaction
         to: handleAddress(transaction[5] as string),
         value: handleBigInt(transaction[6] as string),
         data: transaction[7],
-        accessList: handleAccessList(transaction[8] as Array<[ string, Array<string> ]>),
+        accessList: handleAccessList(
+          transaction[8] as Array<[string, Array<string>]>,
+        ),
         feeCurrency: handleAddress(transaction[9] as string),
       } as CeloTransactionCip64;
       break;
@@ -372,7 +381,9 @@ export function parseCeloTransaction(rawTransaction: BytesLike): CeloTransaction
         to: handleAddress(transaction[5] as string),
         value: handleBigInt(transaction[6] as string),
         data: transaction[7] as string,
-        accessList: handleAccessList(transaction[8] as Array<[ string, Array<string> ]>),
+        accessList: handleAccessList(
+          transaction[8] as Array<[string, Array<string>]>,
+        ),
       } as CeloTransactionEip1559;
       break;
     default:
@@ -470,8 +481,10 @@ function handleBigInt(value: string): bigint {
   return getBigInt(value);
 }
 
-function formatAccessList(value: AccessListish): Array<[ string, Array<string> ]> {
-  return accessListify(value).map((set) => [ set.address, set.storageKeys ]);
+function formatAccessList(
+  value: AccessListish,
+): Array<[string, Array<string>]> {
+  return accessListify(value).map((set) => [set.address, set.storageKeys]);
 }
 
 /*
@@ -485,7 +498,9 @@ function formatAccessList(value: AccessListish): Array<[ string, Array<string> ]
       ]
     ]
 */
-function handleAccessList(value: Array<[ string, Array<string> ]> | '0x'): AccessList {
+function handleAccessList(
+  value: Array<[string, Array<string>]> | "0x",
+): AccessList {
   if (value === "0x") {
     return accessListify([]);
   }

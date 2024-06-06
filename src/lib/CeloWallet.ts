@@ -13,8 +13,16 @@ import {
   Wordlist,
 } from "ethers";
 import CeloProvider from "./CeloProvider";
-import { adjustForGasInflation, convertFromCeloToToken, isEmpty } from "./transaction/utils";
-import { CeloTransaction, CeloTransactionRequest, serializeCeloTransaction } from "./transactions";
+import {
+  adjustForGasInflation,
+  convertFromCeloToToken,
+  isEmpty,
+} from "./transaction/utils";
+import {
+  CeloTransaction,
+  CeloTransactionRequest,
+  serializeCeloTransaction,
+} from "./transactions";
 import { L2_PROXY_ADMIN_ADDRESS } from "../consts";
 import { getConversionRateFromCeloToToken } from "./CoreContract";
 
@@ -25,21 +33,21 @@ const forwardErrors = [
 ] as ErrorCode[];
 
 export default class CeloWallet extends Wallet {
-
-  async isCel2(){
-    const code = await this.provider?.getCode(L2_PROXY_ADMIN_ADDRESS)
-    if (typeof code === 'string') {
-      return code != '0x' && code.length > 2
+  async isCel2() {
+    const code = await this.provider?.getCode(L2_PROXY_ADMIN_ADDRESS);
+    if (typeof code === "string") {
+      return code != "0x" && code.length > 2;
     }
-    return false
+    return false;
   }
-
 
   /**
    * Override to skip checkTransaction step which rejects Celo tx properties
    * https://github.com/ethers-io/ethers.js/blob/master/packages/abstract-signer/src.ts/index.ts
    */
-  async populateTransaction(transaction: CeloTransactionRequest): Promise<CeloTransaction> {
+  async populateTransaction(
+    transaction: CeloTransactionRequest,
+  ): Promise<CeloTransaction> {
     let tx: any = await resolveProperties(transaction);
 
     if (isEmpty(tx.from)) {
@@ -64,7 +72,7 @@ export default class CeloWallet extends Wallet {
           {
             error: error,
             tx: tx,
-          }
+          },
         );
       }
     }
@@ -74,43 +82,53 @@ export default class CeloWallet extends Wallet {
     if (isEmpty(tx.chainId)) {
       tx.chainId = (await this.provider!.getNetwork()).chainId;
     } else {
-      tx.chainId = Promise.all([tx.chainId, (await this.provider!.getNetwork()).chainId]).then(
-        ([txChainId, providerChainId]) => {
-          if (providerChainId !== 0n && txChainId !== providerChainId) {
-            assertArgument(false, "chainId address mismatch", "transaction", transaction);
-          }
-          return txChainId;
+      tx.chainId = Promise.all([
+        tx.chainId,
+        (await this.provider!.getNetwork()).chainId,
+      ]).then(([txChainId, providerChainId]) => {
+        if (providerChainId !== 0n && txChainId !== providerChainId) {
+          assertArgument(
+            false,
+            "chainId address mismatch",
+            "transaction",
+            transaction,
+          );
         }
-      );
+        return txChainId;
+      });
     }
     return resolveProperties<CeloTransaction>(tx);
   }
 
-  // sets feedata for the transaction. 
-  // 
-  async populateFees(tx: CeloTransactionRequest) { 
-    const isCel2 = await this.isCel2()
-    const noFeeCurrency = !tx.feeCurrency
-    const useCIP66ForEasyFeeTransactions = isCel2 && !noFeeCurrency
+  // sets feedata for the transaction.
+  //
+  async populateFees(tx: CeloTransactionRequest) {
+    const isCel2 = await this.isCel2();
+    const noFeeCurrency = !tx.feeCurrency;
+    const useCIP66ForEasyFeeTransactions = isCel2 && !noFeeCurrency;
     // CIP 66 transactions are denominated in CELO not the fee token
-    const feesAreInCELO = noFeeCurrency || useCIP66ForEasyFeeTransactions
+    const feesAreInCELO = noFeeCurrency || useCIP66ForEasyFeeTransactions;
 
     if (isEmpty(tx.maxPriorityFeePerGas) || isEmpty(tx.maxFeePerGas)) {
       const { maxFeePerGas, maxPriorityFeePerGas } = (await (
         this.provider as CeloProvider
       )?.getFeeData(tx.feeCurrency, feesAreInCELO))!;
-      
+
       tx.maxFeePerGas = maxFeePerGas;
       tx.maxPriorityFeePerGas = maxPriorityFeePerGas;
 
       if (useCIP66ForEasyFeeTransactions && isEmpty(tx.maxFeeInFeeCurrency)) {
-        const gasLimit = BigInt(tx.gasLimit!) 
-        const maxFeeInFeeCurrency = await this.estimateMaxFeeInFeeToken({feeCurrency: tx.feeCurrency!, gasLimit, maxFeePerGas: maxFeePerGas!})
-        tx.maxFeeInFeeCurrency = maxFeeInFeeCurrency
+        const gasLimit = BigInt(tx.gasLimit!);
+        const maxFeeInFeeCurrency = await this.estimateMaxFeeInFeeToken({
+          feeCurrency: tx.feeCurrency!,
+          gasLimit,
+          maxFeePerGas: maxFeePerGas!,
+        });
+        tx.maxFeeInFeeCurrency = maxFeeInFeeCurrency;
       }
     }
 
-    return tx
+    return tx;
   }
 
   /**
@@ -126,7 +144,7 @@ export default class CeloWallet extends Wallet {
           false,
           "transaction from address mismatch",
           "transaction.from",
-          transaction.from
+          transaction.from,
         );
       }
       delete tx.from;
@@ -158,26 +176,37 @@ export default class CeloWallet extends Wallet {
 
   /**
    * For cip 66 transactions (the prefered way to pay for gas with fee tokens on Cel2) it is necessary
-   * to provide the absolute limit one is willing to pay denominated in the token. 
+   * to provide the absolute limit one is willing to pay denominated in the token.
    * In contrast with earlier tx types for fee currencies (celo legacy, cip42, cip 64).
-   * 
+   *
    * Calulating Estimation requires the gas, maxfeePerGas and the conversion rate from CELO to feeToken
    * https://github.com/celo-org/celo-proposals/blob/master/CIPs/cip-0066.md
    */
-  async estimateMaxFeeInFeeToken({gasLimit, maxFeePerGas, feeCurrency}: {gasLimit: bigint, maxFeePerGas: bigint, feeCurrency: string}) {
-    const maxGasFeesInCELO = gasLimit * maxFeePerGas
-    const [numerator, denominator] = await getConversionRateFromCeloToToken(feeCurrency,  this)
+  async estimateMaxFeeInFeeToken({
+    gasLimit,
+    maxFeePerGas,
+    feeCurrency,
+  }: {
+    gasLimit: bigint;
+    maxFeePerGas: bigint;
+    feeCurrency: string;
+  }) {
+    const maxGasFeesInCELO = gasLimit * maxFeePerGas;
+    const [numerator, denominator] = await getConversionRateFromCeloToToken(
+      feeCurrency,
+      this,
+    );
     const feeDenominatedInToken = convertFromCeloToToken({
-      amountInCelo: maxGasFeesInCELO, 
-      ratioTOKEN: numerator, 
-      ratioCELO: denominator
-    })
+      amountInCelo: maxGasFeesInCELO,
+      ratioTOKEN: numerator,
+      ratioCELO: denominator,
+    });
 
-    return feeDenominatedInToken
+    return feeDenominatedInToken;
   }
 
   /**
-   * Override to support alternative gas currencies 
+   * Override to support alternative gas currencies
    * @dev (for cip66 txn you want gasPrice in CELO so dont pass in the feeToken)
    * https://github.com/celo-tools/ethers.js/blob/master/packages/abstract-signer/src.ts/index.ts
    */
