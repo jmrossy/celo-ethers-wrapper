@@ -166,7 +166,7 @@ export default class CeloWallet extends Wallet {
    */
   async estimateMaxFeeInFeeToken({gasLimit, maxFeePerGas, feeCurrency}: {gasLimit: bigint, maxFeePerGas: bigint, feeCurrency: string}) {
     const maxGasFeesInCELO = gasLimit * maxFeePerGas
-    const [numerator, denominator] = await getConversionRateFromCeloToToken(feeCurrency, {wallet: this})
+    const [numerator, denominator] = await getConversionRateFromCeloToToken(feeCurrency,  this)
     const feeDenominatedInToken = convertFromCeloToToken({
       amountInCelo: maxGasFeesInCELO, 
       ratioTOKEN: numerator, 

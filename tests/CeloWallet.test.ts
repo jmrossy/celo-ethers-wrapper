@@ -11,9 +11,7 @@ describe('CeloWallet', () => {
             test('populates only maxFeePerGas and maxPriorityFeePerGas', async () => {
               const wallet = getSigner()
 
-              const transactionRequest: CeloTransactionRequest = {
-                
-              }
+              const transactionRequest: CeloTransactionRequest = {}
                 
               const filled = await wallet.populateFees(transactionRequest)
 
@@ -50,7 +48,7 @@ describe('CeloWallet', () => {
         })
         describe('when feeCurrency before cel2', () => {
             test('populates maxFeePerGas and maxPriorityFeePerGas and maxFeeInFeeCurrency', async () => {
-                const wallet = getSigner()
+              const wallet = getSigner()
 
                 
               jest.spyOn(wallet, 'isCel2').mockImplementation(async () => false)

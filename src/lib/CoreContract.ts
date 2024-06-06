@@ -56,8 +56,8 @@ const MINIMAL_REGISTRY_ABI =  [{
 
 
   
-  export async function getConversionRateFromCeloToToken(tokenAddress: string, {wallet}: {wallet: CeloWallet}): Promise<[bigint, bigint]> {
-    const registry = new Contract(CELO_REGISTRY_ADDRESS, MINIMAL_REGISTRY_ABI , wallet)
+  export async function getConversionRateFromCeloToToken(tokenAddress: string, wallet: CeloWallet): Promise<[bigint, bigint]> {
+    const registry = new Contract(CELO_REGISTRY_ADDRESS, MINIMAL_REGISTRY_ABI, wallet)
 
     const oracleAddress = await registry.getAddressForString('SortedOracles')
 
