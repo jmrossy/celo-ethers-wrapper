@@ -1,4 +1,5 @@
 import {
+  AccessList,
   accessListify,
   AccessListish,
   assertArgument,
@@ -23,11 +24,12 @@ import {
   TransactionRequest,
   zeroPadValue,
 } from "ethers";
-import { concatHex, isCIP64 } from "./transaction/utils";
+import { concatHex, isCIP64, isCIP66 } from "./transaction/utils";
 import { EIGHT, EIP155_NUMBER, Y_PARITY_EIP_2098 } from "../consts";
 
 export interface CeloTransactionRequest extends TransactionRequest {
   feeCurrency?: string;
+  maxFeeInFeeCurrency?: bigint;
 }
 
 export interface CeloTransactionCip64 extends TransactionLike {
@@ -35,14 +37,25 @@ export interface CeloTransactionCip64 extends TransactionLike {
   feeCurrency: string;
 }
 
+export interface CeloTransactionCip66 extends TransactionLike {
+  type: TxTypeToPrefix.cip66;
+  feeCurrency: string;
+  maxFeeInFeeCurrency: bigint;
+}
+
 export interface CeloTransactionEip1559 extends TransactionLike {
   type: TxTypeToPrefix.eip1559;
 }
 
-export type CeloTransaction = CeloTransactionCip64 | CeloTransactionEip1559 | TransactionLike;
+export type CeloTransaction =
+  | CeloTransactionCip64
+  | CeloTransactionCip66
+  | CeloTransactionEip1559
+  | TransactionLike;
 
 export enum TxTypeToPrefix {
   cip64 = 0x7b,
+  cip66 = 0x7a,
   eip1559 = 0x02,
 }
 
@@ -65,6 +78,7 @@ export const celoAllowedTransactionKeys = {
   maxFeePerGas: true,
   maxPriorityFeePerGas: true,
   accessList: true,
+  maxFeeInFeeCurrency: true,
 } as const;
 
 type CeloFieldName =
@@ -83,7 +97,8 @@ type CeloFieldName =
       | "blockTag"
       | "enableCcipRead"
     >
-  | "feeCurrency";
+  | "feeCurrency"
+  | "maxFeeInFeeCurrency";
 
 export const celoTransactionFields: Record<CeloFieldName, Field> = {
   nonce: { maxLength: 32, numeric: true } as Field,
@@ -95,6 +110,7 @@ export const celoTransactionFields: Record<CeloFieldName, Field> = {
   data: {} as Field,
   maxFeePerGas: { maxLength: 32, numeric: true } as Field,
   maxPriorityFeePerGas: { maxLength: 32, numeric: true } as Field,
+  maxFeeInFeeCurrency: { maxLength: 32, numeric: true } as Field,
 } as const;
 
 function formatCeloField(name: CeloFieldName, value: any) {
@@ -132,15 +148,40 @@ export function getTxType(tx: CeloTransaction) {
   if (tx.gasPrice) {
     return "";
   }
+
+  if (isCIP66(tx)) {
+    return TxTypeToPrefix.cip66;
+  }
+
   if (isCIP64(tx)) {
     return TxTypeToPrefix.cip64;
   }
+
   return TxTypeToPrefix.eip1559;
 }
 
 function prepareEncodeTx(tx: CeloTransaction, signature?: Signature): RlpStructuredData {
   let raw: RlpStructuredData[] = [];
   switch (tx.type) {
+    case TxTypeToPrefix.cip66:
+      // https://github.com/celo-org/celo-proposals/blob/master/CIPs/cip-0066.md
+      // 0x7a || rlp([chainId, nonce, maxPriorityFeePerGas, maxFeePerGas, gasLimit, to, value, data, accessList, feeCurrency, maxFeeInFeeCurrency, signatureYParity, signatureR, signatureS]).
+      raw = [
+        toBeHex(tx.chainId!),
+        toBeHex(tx.nonce!),
+        tx.maxPriorityFeePerGas ? toBeHex(tx.maxPriorityFeePerGas) : "0x",
+        tx.maxFeePerGas ? toBeHex(tx.maxFeePerGas) : "0x",
+        tx.gasLimit ? toBeHex(tx.gasLimit) : "0x",
+        tx.to || "0x",
+        tx.value ? toBeHex(tx.value) : "0x",
+        tx.data || "0x",
+        formatAccessList(tx.accessList || []),
+        (tx as CeloTransactionCip66).feeCurrency || "0x",
+        (tx as CeloTransactionCip66).maxFeeInFeeCurrency
+          ? toBeHex((tx as CeloTransactionCip66).maxFeeInFeeCurrency)
+          : "0x",
+      ];
+      break;
     case TxTypeToPrefix.cip64:
       // https://github.com/celo-org/celo-proposals/blob/master/CIPs/cip-0064.md
       // 0x7b || rlp([chainId, nonce, maxPriorityFeePerGas, maxFeePerGas, gasLimit, to, value, data, accessList, feeCurrency, signatureYParity, signatureR, signatureS]).
@@ -153,8 +194,7 @@ function prepareEncodeTx(tx: CeloTransaction, signature?: Signature): RlpStructu
         tx.to || "0x",
         tx.value ? toBeHex(tx.value) : "0x",
         tx.data || "0x",
-        // @ts-expect-error
-        tx.accessList || [],
+        formatAccessList(tx.accessList || []),
         (tx as CeloTransactionCip64).feeCurrency || "0x",
       ];
       break;
@@ -170,8 +210,7 @@ function prepareEncodeTx(tx: CeloTransaction, signature?: Signature): RlpStructu
         tx.to || "0x",
         tx.value ? toBeHex(tx.value) : "0x",
         tx.data || "0x",
-        // @ts-expect-error
-        tx.accessList || [],
+        formatAccessList(tx.accessList || []),
       ];
       break;
     default:
@@ -223,6 +262,8 @@ export function serializeCeloTransaction(
     if (fieldName in celoTransactionFields) {
       // @ts-expect-error
       txArgs[fieldName as CeloFieldName] = formatCeloField(fieldName as CeloFieldName, fieldValue);
+    } else if (fieldName === 'accessList') {
+      txArgs[fieldName] = fieldValue
     }
   });
 
@@ -293,6 +334,24 @@ export function parseCeloTransaction(rawTransaction: BytesLike): CeloTransaction
 
   let tx: CeloTransaction;
   switch (type!) {
+    case TxTypeToPrefix.cip66:
+      tx = {
+        type: TxTypeToPrefix.cip66,
+        chainId: handleNumber(transaction[0] as string),
+        nonce: handleNumber(transaction[1] as string),
+        maxPriorityFeePerGas: handleBigInt(transaction[2] as string),
+        maxFeePerGas: handleBigInt(transaction[3] as string),
+        gasLimit: handleBigInt(transaction[4] as string),
+        to: handleAddress(transaction[5] as string),
+        value: handleBigInt(transaction[6] as string),
+        data: transaction[7] as string,
+        accessList: handleAccessList(
+          transaction[8] as Array<[string, Array<string>]>,
+        ),
+        feeCurrency: handleAddress(transaction[9] as string),
+        maxFeeInFeeCurrency: handleBigInt(transaction[10] as string),
+      } as CeloTransactionCip66;
+      break;
     case TxTypeToPrefix.cip64:
       tx = {
         type: TxTypeToPrefix.cip64,
@@ -304,7 +363,9 @@ export function parseCeloTransaction(rawTransaction: BytesLike): CeloTransaction
         to: handleAddress(transaction[5] as string),
         value: handleBigInt(transaction[6] as string),
         data: transaction[7],
-        accessList: handleAccessList(transaction[8] as string),
+        accessList: handleAccessList(
+          transaction[8] as Array<[string, Array<string>]>,
+        ),
         feeCurrency: handleAddress(transaction[9] as string),
       } as CeloTransactionCip64;
       break;
@@ -320,7 +381,9 @@ export function parseCeloTransaction(rawTransaction: BytesLike): CeloTransaction
         to: handleAddress(transaction[5] as string),
         value: handleBigInt(transaction[6] as string),
         data: transaction[7] as string,
-        accessList: handleAccessList(transaction[8] as string),
+        accessList: handleAccessList(
+          transaction[8] as Array<[string, Array<string>]>,
+        ),
       } as CeloTransactionEip1559;
       break;
     default:
@@ -418,16 +481,35 @@ function handleBigInt(value: string): bigint {
   return getBigInt(value);
 }
 
-function handleAccessList(value: string): AccessListish | "0x" {
+function formatAccessList(
+  value: AccessListish,
+): Array<[string, Array<string>]> {
+  return accessListify(value).map((set) => [set.address, set.storageKeys]);
+}
+
+/*
+@param value [
+      [
+        '0x0000000000000000000000000000000000000000',
+        [
+          '0x0000000000000000000000000000000000000000000000000000000000000001',
+          '0x60fdd29ff912ce880cd3edaf9f932dc61d3dae823ea77e0323f94adb9f6a72fe'
+        ]
+      ]
+    ]
+*/
+function handleAccessList(
+  value: Array<[string, Array<string>]> | "0x",
+): AccessList {
   if (value === "0x") {
     return accessListify([]);
   }
-  // TODO: use value
-  return accessListify([]);
+  return accessListify(value);
 }
 
 const baseTxLengths = {
   [TxTypeToPrefix.cip64]: { unsigned: 10, signed: 13 },
+  [TxTypeToPrefix.cip66]: { unsigned: 11, signed: 14 },
   [TxTypeToPrefix.eip1559]: { unsigned: 9, signed: 12 },
   /**
    * Unsigned: RLP([nonce, gasprice, gaslimit, recipient, amount, data, chaindId, 0, 0])
@@ -458,7 +540,7 @@ function splitTypeAndRawTx(
 ): [TxTypeToPrefix | undefined, RlpStructuredData[]] {
   let rawStr = rawTransaction.toString();
   let type: TxTypeToPrefix | undefined;
-  for (const _type of [TxTypeToPrefix.cip64, TxTypeToPrefix.eip1559]) {
+  for (const _type of [TxTypeToPrefix.cip64, TxTypeToPrefix.cip66, TxTypeToPrefix.eip1559]) {
     const prefix = toBeHex(_type);
     if (rawStr.startsWith(prefix)) {
       rawStr = `0x${rawStr.slice(prefix.length)}`;

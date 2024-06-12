@@ -178,3 +178,4 @@ describe("[contract deployment]", () => {
     BLOCK_TIME * 3
   );
 });
+

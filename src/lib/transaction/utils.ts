@@ -1,5 +1,10 @@
 import { hexlify, BigNumberish, isBytesLike, toBeHex } from "ethers";
 import { GAS_INFLATION_FACTOR } from "../../consts";
+import {
+  CeloTransaction,
+  CeloTransactionCip64,
+  CeloTransactionCip66,
+} from "../transactions";
 
 export function isEmpty(value: string | BigNumberish | undefined | null) {
   if (value === undefined || value === null || value === "0" || value === 0n) {
@@ -15,8 +20,18 @@ export function isPresent(value: string | BigNumberish | undefined | null) {
   return !isEmpty(value);
 }
 
-export function isCIP64(tx: any) {
-  return isPresent(tx.feeCurrency);
+export function isCIP64(tx: CeloTransaction): tx is CeloTransactionCip64 {
+  return (
+    isPresent((tx as CeloTransactionCip64).feeCurrency) &&
+    isEmpty((tx as CeloTransactionCip66).maxFeeInFeeCurrency)
+  );
+}
+
+export function isCIP66(tx: CeloTransaction): tx is CeloTransactionCip66 {
+  return (
+    isPresent((tx as CeloTransactionCip66).feeCurrency) &&
+    isPresent((tx as CeloTransactionCip66).maxFeeInFeeCurrency)
+  );
 }
 
 export function concatHex(values: string[]): `0x${string}` {
@@ -40,4 +55,25 @@ export function omit<T extends Object, K extends (keyof T)[]>(
 export function adjustForGasInflation(gas: bigint): bigint {
   // NOTE: prevent floating point math
   return (gas * GAS_INFLATION_FACTOR) / 100n;
+}
+
+interface ConversionParams {
+  amountInCelo: bigint;
+  ratioCELO: bigint;
+  ratioTOKEN: bigint;
+}
+/**
+ * 
+ * @param param0 @ConversionParams
+ *  ratioTOKEN will come from the first position (or numerator) of tuple returned from SortedOracles.medianRate 
+ *  ratioCELO will come from the second position (or denominator) of tuple returned from SortedOracles.medianRate 
+ 
+ * @returns amount in token equal in value to the amountInCelo given. 
+ */
+export function convertFromCeloToToken({
+  amountInCelo,
+  ratioCELO,
+  ratioTOKEN,
+}: ConversionParams) {
+  return (amountInCelo * ratioCELO) / ratioTOKEN;
 }
