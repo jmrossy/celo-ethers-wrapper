@@ -103,9 +103,8 @@ export default class CeloWallet extends Wallet {
   // sets feedata for the transaction.
   //
   async populateFees(tx: CeloTransactionRequest) {
-    const isCel2 = await this.isCel2();
     const noFeeCurrency = !tx.feeCurrency;
-    const useCIP66ForEasyFeeTransactions = isCel2 && !noFeeCurrency;
+    const useCIP66ForEasyFeeTransactions = false // cip66 is not yet implemented in nodes 
     // CIP 66 transactions are denominated in CELO not the fee token
     const feesAreInCELO = noFeeCurrency || useCIP66ForEasyFeeTransactions;
 
@@ -175,12 +174,13 @@ export default class CeloWallet extends Wallet {
   }
 
   /**
-   * For cip 66 transactions (the prefered way to pay for gas with fee tokens on Cel2) it is necessary
-   * to provide the absolute limit one is willing to pay denominated in the token.
+   * @remarks For cip 66 transactions it is necessary to provide the absolute limit one is willing to pay denominated in the token.
    * In contrast with earlier tx types for fee currencies (celo legacy, cip42, cip 64).
-   *
+   
    * Calulating Estimation requires the gas, maxfeePerGas and the conversion rate from CELO to feeToken
    * https://github.com/celo-org/celo-proposals/blob/master/CIPs/cip-0066.md
+   * 
+   * @dev cip66 has yet to be implemented on celo nodes. Dont add maxFeeInFeeCurrency to your transaction. use cip64
    */
   async estimateMaxFeeInFeeToken({
     gasLimit,
