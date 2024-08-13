@@ -21,7 +21,7 @@ describe("CeloWallet", () => {
       });
     });
     describe("when feeCurrency on cel2", () => {
-      test("populates maxFeePerGas and maxPriorityFeePerGas and maxFeeInFeeCurrency", async () => {
+      test("populates maxFeePerGas and maxPriorityFeePerGas (not maxFeeInFeeCurrency)", async () => {
         const wallet = getSigner();
 
         jest.spyOn(wallet, "isCel2").mockImplementation(async () => true);
@@ -36,7 +36,7 @@ describe("CeloWallet", () => {
         expect(typeof filled.maxFeePerGas).toEqual("bigint");
         expect(typeof filled.maxPriorityFeePerGas).toEqual("bigint");
 
-        expect(typeof filled.maxFeeInFeeCurrency).toEqual("bigint");
+        expect(filled.maxFeeInFeeCurrency).toBeUndefined();
         expect(filled.feeCurrency).toEqual(USDC_ADAPTER_ALFAJORES_ADDRESS);
       });
     });
